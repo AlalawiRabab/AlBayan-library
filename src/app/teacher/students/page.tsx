@@ -32,6 +32,9 @@ export default function StudentManagement() {
   const [editingCodeId, setEditingCodeId] = useState<string | null>(null)
   const [editedCode, setEditedCode] = useState('')
   const [isUpdatingCode, setIsUpdatingCode] = useState(false)
+  const [showAddByCodeModal, setShowAddByCodeModal] = useState(false)
+  const [addByCodeValue, setAddByCodeValue] = useState('')
+  const [isAddingByCode, setIsAddingByCode] = useState(false)
 
   useEffect(() => {
     if (userRole !== 'teacher') {
@@ -152,6 +155,39 @@ export default function StudentManagement() {
     setEditedCode('')
   }
 
+  const addStudentByCode = async () => {
+    const code = addByCodeValue?.trim()
+    if (!code) {
+      toast.error('الرجاء إدخال رمز الطالب')
+      return
+    }
+    try {
+      setIsAddingByCode(true)
+      const teacherData = user as any
+      const { error } = await supabase.rpc('teacher_add_student_to_class', {
+        teacher_access_code: teacherData.access_code,
+        student_access_code: code
+      })
+      if (error) {
+        const msg = error.message || ''
+        if (msg.includes('لم يتم العثور') || msg.includes('not found')) toast.error('لم يتم العثور على طالب بهذا الرمز')
+        else if (msg.includes('Already') || msg.includes('already') || msg.includes('في فصلك')) toast.error('الطالب مسجّل بالفعل في فصلك')
+        else if (msg.includes('صلاحية') || msg.includes('permission')) toast.error('ليس لديك صلاحية لإضافة طلاب')
+        else if (msg.includes('لا يوجد فصل')) toast.error('لا يوجد فصل لهذا المعلم. يرجى إنشاء فصل أولاً')
+        else toast.error(msg || 'فشل إضافة الطالب')
+        return
+      }
+      toast.success('تمت إضافة الطالب إلى فصلك')
+      setAddByCodeValue('')
+      setShowAddByCodeModal(false)
+      loadStudents()
+    } catch (e: any) {
+      toast.error(e?.message || 'فشل إضافة الطالب')
+    } finally {
+      setIsAddingByCode(false)
+    }
+  }
+
   const updateAccessCode = async (studentId: string) => {
     if (!editedCode.trim()) {
       toast.error('الرجاء إدخال رمز وصول')
@@ -216,7 +252,7 @@ export default function StudentManagement() {
               </h1>
               <p className="text-gray-400 text-sm md:text-lg">إنشاء وإدارة حسابات الطلاب</p>
             </div>
-            <div className="flex gap-2 md:gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap gap-2 md:gap-3 w-full md:w-auto">
               <Button
                 onClick={() => setShowCreateModal(true)}
                 variant="primary"
@@ -225,6 +261,15 @@ export default function StudentManagement() {
               >
                 <span className="hidden md:inline">➕ إضافة طالب</span>
                 <span className="md:hidden">➕ إضافة</span>
+              </Button>
+              <Button
+                onClick={() => setShowAddByCodeModal(true)}
+                variant="secondary"
+                size="sm"
+                className="flex-1 md:flex-none"
+              >
+                <span className="hidden md:inline">إضافة طالب موجود</span>
+                <span className="md:hidden">رمز طالب</span>
               </Button>
               <Button
                 onClick={() => router.push('/teacher')}
@@ -444,6 +489,60 @@ export default function StudentManagement() {
                     variant="ghost"
                     size="lg"
                     disabled={isCreating}
+                  >
+                    إلغاء
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Add existing student by code modal */}
+        {showAddByCodeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            onClick={() => !isAddingByCode && setShowAddByCodeModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md"
+            >
+              <Card>
+                <h2 className="text-2xl font-bold text-white mb-4">إضافة طالب موجود</h2>
+                <p className="text-gray-400 text-sm mb-4">
+                  أدخل رمز الطالب الذي أنشأه معلم آخر. سيظهر في قائمة فصلك بنفس الرمز.
+                </p>
+                <div className="mb-4">
+                  <label className="block text-white font-bold mb-2">رمز الطالب</label>
+                  <input
+                    type="text"
+                    value={addByCodeValue}
+                    onChange={(e) => setAddByCodeValue(e.target.value.trim().toUpperCase())}
+                    placeholder="مثال: ABC12XYZ"
+                    className="w-full px-4 py-3 text-lg font-mono border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white"
+                    disabled={isAddingByCode}
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={addStudentByCode}
+                    variant="primary"
+                    size="lg"
+                    className="flex-1"
+                    disabled={isAddingByCode || !addByCodeValue.trim()}
+                  >
+                    {isAddingByCode ? 'جاري الإضافة...' : 'إضافة إلى فصلي'}
+                  </Button>
+                  <Button
+                    onClick={() => !isAddingByCode && setShowAddByCodeModal(false)}
+                    variant="ghost"
+                    size="lg"
+                    disabled={isAddingByCode}
                   >
                     إلغاء
                   </Button>

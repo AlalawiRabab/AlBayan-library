@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
-import { leaderboardService } from '@/lib/supabase'
+import { leaderboardService, studentsService } from '@/lib/supabase'
 import { useAppStore } from '@/lib/store'
 import toast, { Toaster } from 'react-hot-toast'
 import { Trophy, Medal, Crown, Star, TrendingUp, Home, Eye, X, BookOpen, FileText, Award, Calendar } from 'lucide-react'
@@ -41,7 +41,7 @@ const getMedalVariant = (title?: string): MedalVariant => {
 
 export default function LeaderboardPage() {
   const router = useRouter()
-  const { user, userRole, hydrated } = useAppStore()
+  const { user, userRole, hydrated, selectedClassroomId } = useAppStore()
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedStudent, setSelectedStudent] = useState<LeaderboardEntry | null>(null)
@@ -49,8 +49,12 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     if (!hydrated) return
+    if (!user || userRole === null) {
+      router.push('/')
+      return
+    }
     loadLeaderboard()
-  }, [hydrated, userRole])
+  }, [hydrated, user, userRole, selectedClassroomId, router])
 
   // Add focus listener to refresh leaderboard when returning to the page
   useEffect(() => {
@@ -81,11 +85,28 @@ export default function LeaderboardPage() {
         data = await leaderboardService.getTeacherLeaderboard(teacherAccessCode)
         console.log('Teacher class leaderboard loaded:', data?.length, 'students')
       } else if (userRole === 'admin') {
-        // Admins can see global leaderboard
         data = await leaderboardService.getLeaderboard()
         console.log('Global leaderboard loaded:', data?.length, 'students')
+      } else if (userRole === 'student') {
+        const accessCode = (user as any)?.access_code
+        if (!accessCode) {
+          toast.error('بيانات الطالب غير متوفرة')
+          setLeaderboard([])
+          return
+        }
+        let classroomId = selectedClassroomId
+        if (!classroomId) {
+          const list = await studentsService.getClassrooms(accessCode)
+          classroomId = list?.[0]?.classroom_id ?? null
+        }
+        if (!classroomId) {
+          toast.error('لا يوجد فصل محدد')
+          setLeaderboard([])
+          return
+        }
+        data = await leaderboardService.getLeaderboardByClassroom(accessCode, classroomId)
+        console.log('Student class leaderboard loaded:', data?.length, 'students')
       } else {
-        // Students and others should not access this page
         router.push('/')
         return
       }

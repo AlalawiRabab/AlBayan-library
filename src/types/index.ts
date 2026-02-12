@@ -105,6 +105,14 @@ export interface StudentAchievement {
   earned_at: string
 }
 
+// Student multiple classrooms
+export interface StudentClassroom {
+  classroom_id: string
+  classroom_name: string
+  grade: number
+  teacher_name: string
+}
+
 // Leaderboard
 export interface LeaderboardEntry {
   student_id: string

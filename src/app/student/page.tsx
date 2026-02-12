@@ -8,43 +8,49 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import StoryCard from '@/components/StoryCard'
 import { useAppStore } from '@/lib/store'
-import { storiesService, supabase } from '@/lib/supabase'
-import { Story } from '@/types'
+import { storiesService, studentsService, supabase } from '@/lib/supabase'
+import { StudentClassroom } from '@/types'
 import toast, { Toaster } from 'react-hot-toast'
 import { showPageLoader } from '@/components/PageTransitionLoader'
 
 export default function StudentDashboard() {
   const router = useRouter()
-  const { user, isAuthenticated, hydrated } = useAppStore()
+  const { user, isAuthenticated, hydrated, selectedClassroomId, setSelectedClassroomId } = useAppStore()
+  const [classrooms, setClassrooms] = useState<StudentClassroom[]>([])
   const [stories, setStories] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({ storiesRead: 0, formsSubmitted: 0, titleName: 'قارئ مبتدئ' })
 
+  const loadClassrooms = async () => {
+    const studentData = user as any
+    if (!studentData?.access_code) return
+    try {
+      const list = await studentsService.getClassrooms(studentData.access_code)
+      setClassrooms(list || [])
+      if (list?.length > 0 && selectedClassroomId == null) {
+        setSelectedClassroomId(list[0].classroom_id)
+      }
+    } catch (e) {
+      console.warn('Failed to load classrooms:', e)
+      setClassrooms([])
+    }
+  }
+
   const loadStories = async () => {
     try {
       setIsLoading(true)
-      console.log('=== LOADING STORIES WITH STATUS ===')
-      
-      // Get stories for student's grade with submission status
       const studentData = user as any
-      console.log('Student data:', studentData)
-      
       if (!studentData || !studentData.access_code) {
-        console.error('No student data or access code found')
         toast.error('بيانات الطالب غير متوفرة')
         return
       }
-      
       const studentAccessCode = studentData.access_code
-      console.log('Student access code:', studentAccessCode)
-      
-      // Use the new student_get_story_status function to get stories with submission status
-      const fetchedStories = await storiesService.getStudentStoryStatus(studentAccessCode)
-      console.log('Student stories with status:', fetchedStories)
-      
+      const fetchedStories = await storiesService.getStudentStoryStatus(
+        studentAccessCode,
+        selectedClassroomId ?? undefined
+      )
       setStories(fetchedStories || [])
-      console.log('Stories set to state:', fetchedStories?.length || 0)
-      
+
       // Load aggregated statistics
       let storiesReadCount = 0
       let formsSubmittedCount = 0
@@ -93,28 +99,36 @@ export default function StudentDashboard() {
       toast.error('حدث خطأ في تحميل القصص')
     } finally {
       setIsLoading(false)
-      console.log('=== END LOADING STORIES DEBUG ===')
     }
   }
 
   useEffect(() => {
-    if (!hydrated) return
-    if (!isAuthenticated || !user) {
-      router.push('/')
+    if (!hydrated || !isAuthenticated || !user) {
+      if (!hydrated) return
+      if (!isAuthenticated || !user) router.push('/')
       return
     }
-
-    loadStories()
+    loadClassrooms()
   }, [hydrated, user, isAuthenticated, router])
 
-  // Add focus listener to refresh stories when returning to the page
+  useEffect(() => {
+    if (!user || !isAuthenticated) return
+    if (classrooms.length === 0) {
+      loadStories()
+      return
+    }
+    if (selectedClassroomId !== null) {
+      loadStories()
+    }
+  }, [user, isAuthenticated, selectedClassroomId, classrooms.length])
+
   useEffect(() => {
     const handleFocus = () => {
       if (isAuthenticated && user) {
+        loadClassrooms()
         loadStories()
       }
     }
-
     if (typeof window !== 'undefined') {
       window.addEventListener('focus', handleFocus)
       return () => window.removeEventListener('focus', handleFocus)
@@ -180,6 +194,17 @@ export default function StudentDashboard() {
               <Button
                 onClick={() => {
                   showPageLoader()
+                  router.push('/leaderboard')
+                }}
+                variant="outline"
+                size="sm"
+                className="flex-1 md:flex-none"
+              >
+                الترتيب
+              </Button>
+              <Button
+                onClick={() => {
+                  showPageLoader()
                   router.push('/student/submissions')
                 }}
                 variant="primary"
@@ -240,6 +265,33 @@ export default function StudentDashboard() {
             </motion.div>
           </div>
         </motion.div>
+
+        {/* Class switcher (multiple classrooms) */}
+        {classrooms.length > 1 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-7xl mx-auto mb-6"
+          >
+            <p className="text-gray-200 text-sm mb-2">اختر الفصل</p>
+            <div className="flex flex-wrap gap-2">
+              {classrooms.map((c) => (
+                <button
+                  key={c.classroom_id}
+                  type="button"
+                  onClick={() => setSelectedClassroomId(c.classroom_id)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    selectedClassroomId === c.classroom_id
+                      ? 'bg-primary text-white shadow-md'
+                      : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                  }`}
+                >
+                  {c.teacher_name ? `فصل ${c.teacher_name}` : c.classroom_name || `الصف ${c.grade}`}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {/* Stories Section */}
         <motion.div

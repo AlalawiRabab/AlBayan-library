@@ -8,9 +8,11 @@ interface AppState {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  selectedClassroomId: string | null
   setUser: (user: User | null, role: UserRole | null) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
+  setSelectedClassroomId: (id: string | null) => void
   logout: () => void
   hydrated: boolean
   setHydrated: (hydrated: boolean) => void
@@ -35,12 +37,15 @@ export const useAppStore = create<AppState>()(
       },
       setLoading: (loading) => set({ isLoading: loading }),
       setError: (error) => set({ error }),
+      selectedClassroomId: null,
+      setSelectedClassroomId: (id) => set({ selectedClassroomId: id }),
       logout: () => {
         set({
           user: null,
           userRole: null,
           isAuthenticated: false,
           error: null,
+          selectedClassroomId: null,
         })
       },
       setHydrated: (hydrated) => set({ hydrated }),
@@ -51,6 +56,7 @@ export const useAppStore = create<AppState>()(
         user: state.user,
         userRole: state.userRole,
         isAuthenticated: state.isAuthenticated,
+        selectedClassroomId: state.selectedClassroomId,
       }),
       onRehydrateStorage: () => (state) => {
         // Called after state is rehydrated from storage

@@ -70,6 +70,22 @@ export const authService = {
   },
 }
 
+export const studentsService = {
+  async getClassrooms(accessCode: string) {
+    try {
+      await authService.loginWithAccessCode(accessCode)
+      const { data, error } = await supabase.rpc('student_get_classrooms', {
+        student_access_code: accessCode
+      })
+      if (error) throw error
+      return (data || []) as { classroom_id: string; classroom_name: string; grade: number; teacher_name: string }[]
+    } catch (error) {
+      console.error('Error in getClassrooms:', error)
+      throw error
+    }
+  },
+}
+
 export const storiesService = {
   async getStoriesByGrade(gradeLevel: number) {
     const { data, error } = await supabase
@@ -109,14 +125,16 @@ export const storiesService = {
     }
   },
 
-  async getStudentStoryStatus(studentAccessCode: string) {
+  async getStudentStoryStatus(studentAccessCode: string, classroomId?: string) {
     try {
-      // First authenticate to ensure session context is set
       await authService.loginWithAccessCode(studentAccessCode)
-      
-      const { data, error } = await supabase.rpc('student_get_story_status', {
+
+      const params: { student_access_code: string; classroom_id_param?: string } = {
         student_access_code: studentAccessCode
-      })
+      }
+      if (classroomId) params.classroom_id_param = classroomId
+
+      const { data, error } = await supabase.rpc('student_get_story_status', params)
 
       if (error) throw error
       return data || []
@@ -436,6 +454,27 @@ export const leaderboardService = {
     
     console.log('Processed leaderboard data:', processedData.length, 'entries')
     return processedData
+  },
+
+  async getLeaderboardByClassroom(accessCode: string, classroomId: string) {
+    const { data, error } = await supabase.rpc('student_get_leaderboard_for_classroom', {
+      student_access_code: accessCode,
+      classroom_id_param: classroomId
+    })
+    if (error) throw error
+    return (data || []).map((entry: any) => ({
+      student_id: entry.student_id,
+      name: entry.student_name,
+      stories_read: entry.stories_read,
+      forms_submitted: entry.forms_submitted,
+      combined_score: entry.combined_score,
+      rank: entry.rank,
+      current_title: entry.current_title,
+      grade: entry.grade,
+      avg_grade: entry.avg_grade,
+      graded_submissions: entry.graded_submissions,
+      total_score: entry.total_score
+    }))
   },
 
   async getTeacherLeaderboard(teacherAccessCode: string) {
