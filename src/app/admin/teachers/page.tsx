@@ -48,6 +48,9 @@ export default function AdminTeacherManagement() {
     assigned_grade: 3,
     permission_level: 'full_access'
   })
+  const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [isSavingName, setIsSavingName] = useState(false)
 
   useEffect(() => {
     if (userRole !== 'admin') {
@@ -126,6 +129,37 @@ export default function AdminTeacherManagement() {
       toast.success('تم نسخ رمز الوصول!')
     } catch (error) {
       toast.error('فشل نسخ رمز الوصول')
+    }
+  }
+
+  const startEditingName = (teacher: Teacher) => {
+    setEditingTeacherId(teacher.id)
+    setEditingName(teacher.name)
+  }
+
+  const cancelEditingName = () => {
+    setEditingTeacherId(null)
+    setEditingName('')
+  }
+
+  const saveTeacherName = async (teacherId: string) => {
+    const name = editingName?.trim()
+    if (!name) {
+      toast.error('الرجاء إدخال الاسم')
+      return
+    }
+    try {
+      setIsSavingName(true)
+      await adminService.updateTeacher(teacherId, { name })
+      toast.success('تم تحديث اسم المعلم بنجاح')
+      setEditingTeacherId(null)
+      setEditingName('')
+      loadTeachers()
+    } catch (error: any) {
+      console.error('Error updating teacher name:', error)
+      toast.error(error?.message || 'فشل تحديث الاسم')
+    } finally {
+      setIsSavingName(false)
     }
   }
 
@@ -341,9 +375,50 @@ export default function AdminTeacherManagement() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
                           <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
-                          <h3 className="text-base md:text-xl font-bold text-white truncate">
-                            {teacher.name}
-                          </h3>
+                          {editingTeacherId === teacher.id ? (
+                            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                              <input
+                                type="text"
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg border-2 border-slate-600 bg-slate-800 text-white font-bold text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                placeholder="اسم المعلم"
+                                disabled={isSavingName}
+                                dir="rtl"
+                              />
+                              <Button
+                                onClick={() => saveTeacherName(teacher.id)}
+                                variant="primary"
+                                size="sm"
+                                disabled={isSavingName || !editingName.trim()}
+                              >
+                                {isSavingName ? '...' : 'حفظ'}
+                              </Button>
+                              <Button
+                                onClick={cancelEditingName}
+                                variant="ghost"
+                                size="sm"
+                                disabled={isSavingName}
+                              >
+                                إلغاء
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <h3 className="text-base md:text-xl font-bold text-white truncate">
+                                {teacher.name}
+                              </h3>
+                              <Button
+                                onClick={() => startEditingName(teacher)}
+                                variant="ghost"
+                                size="sm"
+                                icon={<Edit className="w-3 h-3 md:w-4 md:h-4" />}
+                                title="تعديل الاسم"
+                              >
+                                <span className="sr-only md:not-sr-only md:mr-1">تعديل الاسم</span>
+                              </Button>
+                            </>
+                          )}
                           <span className={`px-2 py-1 rounded-full text-xs md:text-sm font-bold flex-shrink-0 ${
                             teacher.is_active
                               ? 'bg-accent-green text-white'
