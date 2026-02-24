@@ -286,7 +286,7 @@ export default function StudentDashboard() {
                       : 'bg-white/10 text-gray-200 hover:bg-white/20'
                   }`}
                 >
-                  {c.teacher_name ? `فصل ${c.teacher_name}` : c.classroom_name || `الصف ${c.grade}`}
+                  {[c.classroom_name || `الصف ${c.grade}`, c.teacher_name].filter(Boolean).join(' — ')}
                 </button>
               ))}
             </div>
