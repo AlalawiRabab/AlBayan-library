@@ -51,46 +51,37 @@ export default function StudentDashboard() {
       )
       setStories(fetchedStories || [])
 
-      // Load aggregated statistics
+      // Load stats and achievement title from students table (same source as profile)
       let storiesReadCount = 0
       let formsSubmittedCount = 0
+      let titleName = 'قارئ مبتدئ'
 
       try {
-        const { data: statsRow, error: statsError } = await supabase
-          .from('student_statistics')
-          .select('stories_easy, stories_medium, stories_hard, total_submissions')
-          .eq('student_id', studentData.id)
+        const { data: studentRow, error: studentError } = await supabase
+          .from('students')
+          .select(`
+            stories_read,
+            forms_submitted,
+            achievement_titles!students_current_title_id_fkey ( name_arabic )
+          `)
+          .eq('id', studentData.id)
           .single()
 
-        if (statsError) {
-          console.warn('Unable to load student statistics, falling back to derived counts:', statsError)
+        if (!studentError && studentRow) {
+          storiesReadCount = (studentRow as any).stories_read ?? 0
+          formsSubmittedCount = (studentRow as any).forms_submitted ?? 0
+          const title = (studentRow as any).achievement_titles
+          if (title?.name_arabic) titleName = title.name_arabic
         }
-
-        if (statsRow) {
-          storiesReadCount =
-            (statsRow.stories_easy ?? 0) +
-            (statsRow.stories_medium ?? 0) +
-            (statsRow.stories_hard ?? 0)
-          formsSubmittedCount = statsRow.total_submissions ?? 0
-        }
-      } catch (statsFetchError) {
-        console.warn('Error fetching student statistics:', statsFetchError)
-      }
-
-      if (storiesReadCount === 0) {
-        storiesReadCount =
-          fetchedStories?.filter((story: any) => story.submission_status !== 'not_submitted').length || 0
-      }
-
-      if (formsSubmittedCount === 0) {
-        formsSubmittedCount =
-          fetchedStories?.filter((story: any) => story.submission_status !== 'not_submitted').length || 0
+      } catch (e) {
+        console.warn('Error loading student stats for dashboard:', e)
       }
 
       setStats(prev => ({
         ...prev,
         storiesRead: storiesReadCount,
-        formsSubmitted: formsSubmittedCount
+        formsSubmitted: formsSubmittedCount,
+        titleName
       }))
       
     } catch (error) {
