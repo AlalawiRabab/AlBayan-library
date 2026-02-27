@@ -191,7 +191,7 @@ const loadLeaderboard = async () => {
             <Card className="p-2 sm:p-2.5 md:p-3 overflow-hidden">
               <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
                 <Trophy className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
-                <h2 className="text-lg md:text-xl font-bold text-white">جدول الترتيب (الصفوف 3، 4، 6)</h2>
+                <h2 className="text-lg md:text-xl font-bold text-white">جدول الترتيب (الصفوف 3، 5، 6)</h2>
               </div>
               
               {isLoadingLeaderboard ? (
