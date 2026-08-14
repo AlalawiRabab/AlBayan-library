@@ -10,7 +10,7 @@ import { useAppStore } from '@/lib/store'
 import { authService, leaderboardService } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import toast, { Toaster } from 'react-hot-toast'
-import { Trophy, Crown, Medal, Users, BookOpen, LogIn, UserCheck, Shield, GraduationCap } from 'lucide-react'
+import { Trophy, Crown, Medal, Users, BookOpen } from 'lucide-react'
 import { showPageLoader } from '@/components/PageTransitionLoader'
 import Dialog from '@/components/Dialog'
 import { FormField, TextInput } from '@/components/FormField'
@@ -183,7 +183,7 @@ const loadLeaderboard = async () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mb-4 md:mb-6"
           >
-            <Card className="overflow-hidden p-4 sm:p-5 md:p-6" elevation="sm">
+            <Card className="overflow-hidden border-slate-300 p-4 sm:p-5 md:p-6" elevation="sm">
               <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
                 <Trophy className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
                 <h2 className="text-lg md:text-xl font-bold text-ink">جدول الترتيب (الصفوف 3، 5، 6)</h2>
@@ -212,18 +212,18 @@ const loadLeaderboard = async () => {
                         transition={{ duration: 0.6, delay: 0.2 }}
                         className="flex flex-col items-center"
                       >
-                        <div className="bg-white   text-slate-900 w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                        <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary-200 bg-primary-100 text-primary-700 shadow-card sm:h-14 sm:w-14 md:mb-3 md:h-20 md:w-20">
                           <Medal className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
                         </div>
-                        <div className="w-full rounded-lg bg-slate-50 p-2 text-center md:w-auto md:min-w-[120px] md:max-w-[120px] md:p-4">
+                        <div className="w-full rounded-xl border-2 border-primary-200 bg-primary-50 p-2 text-center shadow-card md:w-auto md:min-w-[120px] md:max-w-[120px] md:p-4">
                           <h3 className="text-xs sm:text-sm md:text-lg font-bold text-ink break-words leading-tight px-1">{leaderboard[1].name}</h3>
-                          <p className="text-[10px] sm:text-xs md:text-sm text-slate-600">المركز الثاني</p>
+                          <p className="text-[10px] font-semibold text-primary-700 sm:text-xs md:text-sm">المركز الثاني</p>
                           {leaderboard[1].current_title && (
-                            <div className="mt-1 truncate rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                            <div className="mt-1 truncate rounded-full border border-primary-200 bg-primary-100 px-2 py-1 text-xs font-semibold text-primary-700">
                                {leaderboard[1].current_title}
                             </div>
                           )}
-                          <div className="text-lg md:text-xl font-bold text-slate-600 mt-2">{leaderboard[1].combined_score}</div>
+                          <div className="mt-2 text-lg font-extrabold text-primary-700 md:text-xl">{leaderboard[1].combined_score}</div>
                           {leaderboard[1].avg_grade && (
                             <div className="text-xs md:text-sm text-secondary-700 mt-1">
                               معدل: <bdi dir="ltr">{Math.round(leaderboard[1].avg_grade)}%</bdi>
@@ -241,18 +241,18 @@ const loadLeaderboard = async () => {
                         transition={{ duration: 0.6, delay: 0.1 }}
                         className="flex flex-col items-center"
                       >
-                        <div className="bg-white   text-ink w-14 h-14 sm:w-16 sm:h-16 md:w-24 md:h-24 rounded-full flex items-center justify-center mb-2 md:mb-3 shadow-lg">
+                        <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-amber-300 bg-amber-100 text-amber-800 shadow-lg sm:h-16 sm:w-16 md:mb-3 md:h-24 md:w-24">
                           <Crown className="w-6 h-6 sm:w-7 sm:h-7 md:w-10 md:h-10" />
                         </div>
-                        <div className="w-full rounded-lg border-2 border-amber-200/30 bg-white p-2 text-center md:w-auto md:min-w-[140px] md:max-w-[140px] md:p-4">
+                        <div className="w-full rounded-xl border-2 border-amber-400 bg-amber-50 p-2 text-center shadow-card md:w-auto md:min-w-[140px] md:max-w-[140px] md:p-4">
                           <h3 className="text-sm sm:text-base md:text-xl font-bold text-ink break-words leading-tight px-1">{leaderboard[0].name}</h3>
-                          <p className="text-[10px] sm:text-xs md:text-sm text-amber-700">المركز الأول</p>
+                          <p className="text-[10px] font-bold text-amber-800 sm:text-xs md:text-sm">المركز الأول</p>
                           {leaderboard[0].current_title && (
-                            <div className="mt-1 truncate rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                            <div className="mt-1 truncate rounded-full border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
                                {leaderboard[0].current_title}
                             </div>
                           )}
-                          <div className="text-xl md:text-2xl font-bold text-amber-700 mt-2">{leaderboard[0].combined_score}</div>
+                          <div className="mt-2 text-xl font-extrabold text-amber-800 md:text-2xl">{leaderboard[0].combined_score}</div>
                           {leaderboard[0].avg_grade && (
                             <div className="text-xs md:text-sm text-secondary-700 mt-1">
                               معدل: <bdi dir="ltr">{Math.round(leaderboard[0].avg_grade)}%</bdi>
@@ -270,18 +270,18 @@ const loadLeaderboard = async () => {
                         transition={{ duration: 0.6, delay: 0.3 }}
                         className="flex flex-col items-center"
                       >
-                        <div className="bg-white   text-ink w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                        <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-orange-300 bg-orange-100 text-orange-800 shadow-card sm:h-14 sm:w-14 md:mb-3 md:h-20 md:w-20">
                           <Medal className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
                         </div>
-                        <div className="w-full rounded-lg bg-slate-50 p-2 text-center md:w-auto md:min-w-[120px] md:max-w-[120px] md:p-4">
+                        <div className="w-full rounded-xl border-2 border-orange-300 bg-orange-50 p-2 text-center shadow-card md:w-auto md:min-w-[120px] md:max-w-[120px] md:p-4">
                           <h3 className="text-xs sm:text-sm md:text-lg font-bold text-ink break-words leading-tight px-1">{leaderboard[2].name}</h3>
-                          <p className="text-xs md:text-sm text-slate-600">المركز الثالث</p>
+                          <p className="text-xs font-semibold text-orange-800 md:text-sm">المركز الثالث</p>
                           {leaderboard[2].current_title && (
-                            <div className="mt-1 truncate rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                            <div className="mt-1 truncate rounded-full border border-orange-300 bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-900">
                                {leaderboard[2].current_title}
                             </div>
                           )}
-                          <div className="text-lg md:text-xl font-bold text-slate-600 mt-2">{leaderboard[2].combined_score}</div>
+                          <div className="mt-2 text-lg font-extrabold text-orange-800 md:text-xl">{leaderboard[2].combined_score}</div>
                           {leaderboard[2].avg_grade && (
                             <div className="text-xs md:text-sm text-secondary-700 mt-1">
                               معدل: <bdi dir="ltr">{Math.round(leaderboard[2].avg_grade)}%</bdi>
@@ -302,18 +302,18 @@ const loadLeaderboard = async () => {
                           transition={{ duration: 0.6, delay: 0.4 }}
                           className="flex flex-col items-center"
                         >
-                          <div className="bg-white   text-ink w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary-200 bg-primary-100 text-primary-700 shadow-card md:mb-3 md:h-16 md:w-16">
                             <Medal className="w-5 h-5 md:w-7 md:h-7" />
                           </div>
-                          <div className="min-w-full rounded-lg bg-slate-50 p-2 text-center md:p-3">
+                          <div className="min-w-full rounded-xl border-2 border-primary-200 bg-primary-50 p-2 text-center shadow-card md:p-3">
                             <h3 className="text-sm md:text-base font-bold text-ink break-words leading-tight px-1 mb-1">{leaderboard[3].name}</h3>
-                            <div className="text-xs md:text-sm text-slate-600 mb-1">المركز الرابع</div>
+                            <div className="mb-1 text-xs font-semibold text-primary-700 md:text-sm">المركز الرابع</div>
                             {leaderboard[3].current_title && (
-                              <div className="text-xs bg-secondary-50 text-secondary-700 px-2 py-1 rounded-full my-1 truncate">
+                              <div className="my-1 truncate rounded-full border border-primary-200 bg-primary-100 px-2 py-1 text-xs font-semibold text-primary-700">
                                  {leaderboard[3].current_title}
                               </div>
                             )}
-                            <div className="text-lg md:text-xl font-bold text-slate-600 mt-1">{leaderboard[3].combined_score}</div>
+                            <div className="mt-1 text-lg font-extrabold text-primary-700 md:text-xl">{leaderboard[3].combined_score}</div>
                             {leaderboard[3].avg_grade && (
                               <div className="text-xs md:text-sm text-secondary-700 mt-1">
                                 معدل: <bdi dir="ltr">{Math.round(leaderboard[3].avg_grade)}%</bdi>
@@ -330,18 +330,18 @@ const loadLeaderboard = async () => {
                           transition={{ duration: 0.6, delay: 0.5 }}
                           className="flex flex-col items-center"
                         >
-                          <div className="bg-white   text-ink w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-secondary-200 bg-secondary-100 text-secondary-700 shadow-card md:mb-3 md:h-16 md:w-16">
                             <Medal className="w-5 h-5 md:w-7 md:h-7" />
                           </div>
-                          <div className="min-w-full rounded-lg bg-slate-50 p-2 text-center md:p-3">
+                          <div className="min-w-full rounded-xl border-2 border-secondary-200 bg-secondary-50 p-2 text-center shadow-card md:p-3">
                             <h3 className="text-sm md:text-base font-bold text-ink break-words leading-tight px-1 mb-1">{leaderboard[4].name}</h3>
-                            <div className="text-xs md:text-sm text-slate-600 mb-1">المركز الخامس</div>
+                            <div className="mb-1 text-xs font-semibold text-secondary-700 md:text-sm">المركز الخامس</div>
                             {leaderboard[4].current_title && (
-                              <div className="text-xs bg-secondary-50 text-secondary-700 px-2 py-1 rounded-full my-1 truncate">
+                              <div className="my-1 truncate rounded-full border border-secondary-200 bg-secondary-100 px-2 py-1 text-xs font-semibold text-secondary-700">
                                  {leaderboard[4].current_title}
                               </div>
                             )}
-                            <div className="text-lg md:text-xl font-bold text-slate-600 mt-1">{leaderboard[4].combined_score}</div>
+                            <div className="mt-1 text-lg font-extrabold text-secondary-700 md:text-xl">{leaderboard[4].combined_score}</div>
                             {leaderboard[4].avg_grade && (
                               <div className="text-xs md:text-sm text-secondary-700 mt-1">
                                 معدل: <bdi dir="ltr">{Math.round(leaderboard[4].avg_grade)}%</bdi>
