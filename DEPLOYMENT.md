@@ -45,8 +45,13 @@ Edit `.env.local`:
 # Get these from your Supabase project settings
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-NEXT_PUBLIC_APP_NAME=المكتبة الإلكترونية للقصص
+GROQ_API_KEY=your_rotated_groq_api_key
+AUTO_GRADING_RPC_SECRET=your_high_entropy_server_secret
 ```
+
+The Groq key and grading secret are server-only deployment variables. The
+grading secret must match the SHA-256 value configured in the deployed
+`secure-auto-grading` Edge Function. Never expose a Supabase service-role key.
 
 ### 4. Run Development Server
 
@@ -61,13 +66,13 @@ Visit http://localhost:3000
 ### Test All Three User Roles
 
 1. **Admin Testing**
-   - Code: `ADMIN2025`
+   - Code: use the active admin code stored securely outside the repository
    - Visit: http://localhost:3000
    - Check admin dashboard loads
    - Verify all menu items are clickable
 
 2. **Teacher Testing**
-   - Code: `TEACH3A2025` (Grade 3)
+   - Code: use the assigned teacher code (Grade 3)
    - Check teacher dashboard loads
    - Verify student management options
 

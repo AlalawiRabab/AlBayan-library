@@ -4,10 +4,11 @@ import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import LoadingState from '@/components/LoadingState'
 import { useAppStore } from '@/lib/store'
-import { formsService, storiesService } from '@/lib/supabase'
+import { formsService } from '@/lib/supabase'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Send, BookOpen } from 'lucide-react'
+import { ArrowRight, Send, BookOpen, AlertCircle, Mic } from 'lucide-react'
 
 interface Question {
   id: string
@@ -49,7 +50,6 @@ export default function StoryQuestions(props: Props) {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isAutoGrading, setIsAutoGrading] = useState(false)
   const [hasAudio, setHasAudio] = useState(false)
   const [hasSavedAudio, setHasSavedAudio] = useState(false)
   const [firstUnansweredId, setFirstUnansweredId] = useState<string | null>(null)
@@ -147,7 +147,7 @@ export default function StoryQuestions(props: Props) {
 
   const handlePrimaryAction = async () => {
     if (!hasAudio) {
-      toast.error('📹 يجب تسجيل الصوت أولاً')
+      toast.error(' يجب تسجيل الصوت أولاً')
       scrollToRecording()
       return
     }
@@ -157,7 +157,7 @@ export default function StoryQuestions(props: Props) {
       return
     }
     if (firstUnansweredId) {
-      toast.error('📝 أجب على نموذج الأسئلة')
+      toast.error(' أجب على نموذج الأسئلة')
       scrollToFirstUnanswered()
       return
     }
@@ -172,67 +172,56 @@ export default function StoryQuestions(props: Props) {
     const storageKey = `audio_recording_${storyId}`
     const audioUrlCheck = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null
     if (!audioUrlCheck) {
-      toast.error('يجب حفظ تسجيل الصوت قبل إرسال الإجابات 📹')
+      toast.error('يجب حفظ تسجيل الصوت قبل إرسال الإجابات ')
       return
     }
 
     try {
       setIsSubmitting(true)
-      setIsAutoGrading(true)
       toast.loading('جاري التقييم التلقائي للإجابات...', { id: 'auto-grading' })
 
       const studentData = user as any
       const storageKey = `audio_recording_${storyId}`
       const audioUrl = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null
 
-      // Fetch story for auto-grading
       const studentAccessCode = studentData.access_code
-      const story = await storiesService.getStudentSingleStory(studentAccessCode, storyId)
-      if (!story) {
-        toast.error('لا يمكن العثور على القصة', { id: 'auto-grading' })
-        return
+      const submissionKeyStorage = `submission_attempt_${storyId}_${formTemplate.id}`
+      let idempotencyKey = localStorage.getItem(submissionKeyStorage)
+      if (!idempotencyKey) {
+        idempotencyKey = crypto.randomUUID()
+        localStorage.setItem(submissionKeyStorage, idempotencyKey)
       }
-
-      let autoGrade: number | null = null
-      let autoFeedback: string | null = null
-      try {
-        toast.loading('جاري تقييم الإجابات بالذكاء الاصطناعي...', { id: 'auto-grading' })
-        const gradingResponse = await fetch('/api/auto-grade', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            questions: formTemplate.questions,
-            answers,
-            storyContent: story.content_arabic,
-            storyTitle: story.title_arabic,
-            difficulty: story.difficulty,
-            gradeLevel: story.grade_level
-          })
+      toast.loading('جاري تقييم الإجابات بالذكاء الاصطناعي...', { id: 'auto-grading' })
+      const submissionResponse = await fetch('/api/student/submit-and-auto-grade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentAccessCode,
+          storyId,
+          formTemplateId: formTemplate.id,
+          idempotencyKey,
+          answers,
+          audioUrl: audioUrl || undefined
         })
-        const gradingResult = await gradingResponse.json()
-        autoGrade = gradingResult.grade
-        autoFeedback = gradingResult.feedback
-        toast.success(`تم التقييم التلقائي! الدرجة: ${autoGrade}`, { id: 'auto-grading' })
-      } catch (gradingError) {
-        console.error('Auto-grading failed:', gradingError)
-        toast.error('فشل التقييم التلقائي، سيتم إرسال الإجابة للمعلم', { id: 'auto-grading' })
+      })
+      const submissionResult = await submissionResponse.json()
+
+      if (!submissionResponse.ok) {
+        throw new Error(submissionResult.error || 'تعذر إرسال الإجابات')
       }
 
-      await formsService.submitForm(
-        studentData.access_code,
-        storyId,
-        formTemplate.id,
-        answers,
-        audioUrl || undefined,
-        autoGrade || undefined,
-        autoFeedback || undefined
-      )
+      if (submissionResult.autoGraded) {
+        toast.success(`تم التقييم التلقائي! الدرجة: ${submissionResult.grade}`, { id: 'auto-grading' })
+      } else {
+        toast.error('فشل التقييم التلقائي، تم إرسال الإجابة للمعلم', { id: 'auto-grading' })
+      }
 
       if (audioUrl) {
         localStorage.removeItem(storageKey)
       }
+      localStorage.removeItem(submissionKeyStorage)
 
-      toast.success('أحسنتِ ايتها القارئة المبدعة! 🌟 لقد أتممتِ المهمة بنجاح، ونحن فخورون بكِ')
+      toast.success('أحسنتِ ايتها القارئة المبدعة!  لقد أتممتِ المهمة بنجاح، ونحن فخورون بكِ')
       if (onSubmitted) {
         onSubmitted()
       } else {
@@ -247,27 +236,19 @@ export default function StoryQuestions(props: Props) {
       toast.error('حدث خطأ في إرسال الإجابات')
     } finally {
       setIsSubmitting(false)
-      setIsAutoGrading(false)
       toast.dismiss('auto-grading')
     }
   }
 
   if (isLoading) {
-    return (
-      <div className="w-full flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="text-5xl mb-3 animate-bounce">📝</div>
-          <p className="text-lg md:text-xl font-bold text-white">جاري تحميل الأسئلة...</p>
-        </div>
-      </div>
-    )
+    return <LoadingState label="جاري تحميل الأسئلة..." />
   }
 
   if (!formTemplate) {
     return (
       <Card elevation="sm" padding="lg" className="text-center">
-        <div className="text-4xl mb-3">❌</div>
-        <p className="text-lg md:text-xl font-bold text-white">لا يوجد نموذج أسئلة لهذه القصة</p>
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-700"><AlertCircle className="h-7 w-7" aria-hidden="true" /></div>
+        <p className="text-lg md:text-xl font-bold text-ink">لا يوجد نموذج أسئلة لهذه القصة</p>
         {showBack && (
           <Button onClick={() => window.history.back()} className="mt-4">
             العودة
@@ -282,18 +263,18 @@ export default function StoryQuestions(props: Props) {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
         <div className="flex-1">
-          <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-xl md:text-2xl font-bold text-ink flex items-center gap-2">
             <BookOpen className="w-7 h-7 md:w-8 md:h-8 text-accent-green" />
             <span>{formTemplate.title_arabic}</span>
           </h2>
-          <p className="text-gray-200 text-sm md:text-base mt-2">{formTemplate.description_arabic}</p>
+          <p className="text-slate-700 text-sm md:text-base mt-2">{formTemplate.description_arabic}</p>
         </div>
         {showBack && (
           <Button
             onClick={() => window.history.back()}
             variant="ghost"
             size="sm"
-            icon={<ArrowLeft className="w-4 h-4" />}
+            icon={<ArrowRight className="w-4 h-4" />}
             className="self-end md:self-auto"
           >
             العودة
@@ -315,11 +296,11 @@ export default function StoryQuestions(props: Props) {
               >
                 <Card elevation="sm" padding="md" className="p-4 md:p-6">
                   <div className="mb-4">
-                    <h3 className="text-lg md:text-xl font-bold text-white mb-2">
+                    <h3 className="text-lg md:text-xl font-bold text-ink mb-2">
                       السؤال {index + 1}
-                      {question.required && <span className="text-accent-red mr-2">*</span>}
+                      {question.required && <span className="text-accent-red me-2">*</span>}
                     </h3>
-                    <p className="text-base md:text-lg text-gray-200 mb-4">{question.text_arabic}</p>
+                    <p className="text-base md:text-lg text-slate-700 mb-4">{question.text_arabic}</p>
                   </div>
 
                   {question.type === 'short_answer' && (
@@ -347,7 +328,7 @@ export default function StoryQuestions(props: Props) {
                   {question.type === 'multiple_choice' && question.options && (
                     <div className="space-y-2 md:space-y-3">
                       {question.options.map((option, optionIndex) => (
-                        <label key={optionIndex} className="flex items-center space-x-2 md:space-x-3 cursor-pointer py-2 md:py-0">
+                        <label key={optionIndex} className="flex items-center gap-2 md:gap-3 cursor-pointer py-2 md:py-0">
                           <input
                             type="radio"
                             name={question.id}
@@ -357,7 +338,7 @@ export default function StoryQuestions(props: Props) {
                             className="w-6 h-6 md:w-5 md:h-5 text-primary"
                             disabled={isSubmitting}
                           />
-                          <span className="text-base md:text-lg text-gray-200">{option}</span>
+                          <span className="text-base md:text-lg text-slate-700">{option}</span>
                         </label>
                       ))}
                     </div>
@@ -376,16 +357,16 @@ export default function StoryQuestions(props: Props) {
           >
             <Card elevation="sm" padding="md">
               <div className="text-center">
-                <p className="text-gray-200 mb-2">تقدم الإجابة</p>
+                <p className="text-slate-700 mb-2">تقدم الإجابة</p>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <motion.div
-                    className="bg-gradient-to-r from-primary to-secondary h-3 rounded-full"
+                    className="bg-white   h-3 rounded-full"
                     initial={{ width: '0%' }}
                     animate={{ width: `${(Object.values(answers).filter(a => a.trim() !== '').length / formTemplate.questions.length) * 100}%` }}
                     transition={{ duration: 0.5 }}
                   />
                 </div>
-                <p className="text-sm text-gray-200 mt-2">
+                <p className="text-sm text-slate-700 mt-2">
                   {Object.values(answers).filter(a => a.trim() !== '').length} من {formTemplate.questions.length} أسئلة
                 </p>
               </div>
@@ -394,20 +375,20 @@ export default function StoryQuestions(props: Props) {
         </>
       ) : (
         <Card elevation="sm" padding="lg" className="text-center">
-          <div className="text-3xl mb-2">🎤</div>
-          <p className="text-white font-bold">سجّل صوتك أولاً لإظهار نموذج الأسئلة</p>
-          <p className="text-gray-200 text-sm mt-2">استخدم الزر في الأسفل لبدء التسجيل</p>
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-700"><Mic className="h-7 w-7" aria-hidden="true" /></div>
+          <p className="text-ink font-bold">سجّل صوتك أولاً لإظهار نموذج الأسئلة</p>
+          <p className="text-slate-700 text-sm mt-2">استخدم الزر في الأسفل لبدء التسجيل</p>
         </Card>
       )}
 
       {/* Floating Submit Bar */}
       <div className="fixed inset-x-0 bottom-4 px-4 z-40">
         <div className="mx-auto max-w-6xl">
-          <div className="bg-white/90 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl p-3 md:p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-xl md:p-4">
             {/* Contextual message area */}
             {!hasAudio && (
               <div className="text-gray-800 text-sm md:text-base mb-2">
-                🎤 تسجيل القراءة مطلوب قبل إرسال الإجابات
+                 تسجيل القراءة مطلوب قبل إرسال الإجابات
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
@@ -419,7 +400,7 @@ export default function StoryQuestions(props: Props) {
                   size="md"
                   className="whitespace-nowrap"
                 >
-                  {isRecordingExternal ? '⏹️ إيقاف التسجيل' : '🎤 بدء التسجيل'}
+                  {isRecordingExternal ? ' إيقاف التسجيل' : ' بدء التسجيل'}
                 </Button>
               )}
               {/* Play/Pause control when audio exists */}
@@ -430,7 +411,7 @@ export default function StoryQuestions(props: Props) {
                   size="md"
                   className="whitespace-nowrap min-w-[120px]"
                 >
-                  {isPlayingExternal ? '⏸️ إيقاف' : '▶️ تشغيل'}
+                  {isPlayingExternal ? ' إيقاف' : ' تشغيل'}
                 </Button>
               )}
               {/* Record again: delete old and start new */}
@@ -441,7 +422,7 @@ export default function StoryQuestions(props: Props) {
                   size="md"
                   className="whitespace-nowrap min-w-[140px] border-2 border-gray-300"
                 >
-                  🔁 إعادة التسجيل
+                   إعادة التسجيل
                 </Button>
               )}
               <Button
@@ -456,11 +437,11 @@ export default function StoryQuestions(props: Props) {
                 {isSubmitting
                   ? 'جاري الإرسال...'
                   : !hasAudio
-                    ? '📹 سجّل صوتك أولاً'
+                    ? ' سجّل صوتك أولاً'
                     : (!hasSavedAudio && hasAudioExternal)
                       ? 'إرسال التسجيل'
                       : firstUnansweredId
-                        ? '📝 أجب على نموذج الأسئلة'
+                        ? ' أجب على نموذج الأسئلة'
                         : 'إرسال الإجابات'}
               </Button>
             </div>

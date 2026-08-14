@@ -45,6 +45,28 @@ export const inferAudioMimeFromUrl = (url?: string): string => {
   return 'audio/webm'
 }
 
+export const getTrustedStudentRecordingUrl = (value?: string | null): string | undefined => {
+  if (!value) return undefined
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!supabaseUrl) return undefined
+
+  try {
+    const audioUrl = new URL(value)
+    const projectUrl = new URL(supabaseUrl)
+    const publicPrefix = '/storage/v1/object/public/student-recordings/voice-recordings/'
+    const signedPrefix = '/storage/v1/object/sign/student-recordings/voice-recordings/'
+    if (
+      audioUrl.protocol !== 'https:' ||
+      audioUrl.host !== projectUrl.host ||
+      (!audioUrl.pathname.startsWith(publicPrefix) && !audioUrl.pathname.startsWith(signedPrefix))
+    ) return undefined
+    if (audioUrl.pathname.startsWith(signedPrefix) && !audioUrl.searchParams.get('token')) return undefined
+    return audioUrl.toString()
+  } catch {
+    return undefined
+  }
+}
+
 export const getDifficultyColor = (difficulty: string) => {
   switch (difficulty) {
     case 'easy':

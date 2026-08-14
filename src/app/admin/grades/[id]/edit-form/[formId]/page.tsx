@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowRight, Save } from 'lucide-react'
 
 interface Question {
   id: string
@@ -22,7 +22,7 @@ interface Question {
 export default function EditForm() {
   const router = useRouter()
   const params = useParams()
-  const { userRole } = useAppStore()
+  const { userRole, hydrated } = useAppStore()
   const gradeId = params.id as string
   const formId = params.formId as string
   
@@ -34,12 +34,13 @@ export default function EditForm() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
+    if (!hydrated) return
     if (userRole !== 'admin') {
       router.push('/')
       return
     }
     loadForm()
-  }, [userRole, router, formId])
+  }, [hydrated, userRole, router, formId])
 
   const loadForm = async () => {
     try {
@@ -91,7 +92,7 @@ export default function EditForm() {
 
       if (error) throw error
 
-      toast.success('تم تحديث النموذج بنجاح! 🎉')
+      toast.success('تم تحديث النموذج بنجاح! ')
       router.push(`/admin/grades/${gradeId}`)
     } catch (error) {
       console.error('Error updating form:', error)
@@ -106,23 +107,23 @@ export default function EditForm() {
       <div className="min-h-screen bg-cloud flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-gray-300 mt-4">جاري تحميل النموذج...</p>
+          <p className="text-slate-600 mt-4">جاري تحميل النموذج...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-cloud p-4 md:p-6">
+    <div className="page-container min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">تعديل النموذج</h1>
+          <h1 className="text-3xl font-bold text-ink">تعديل النموذج</h1>
           <Button
             onClick={() => router.push(`/admin/grades/${gradeId}`)}
             variant="ghost"
             size="md"
-            icon={<ArrowLeft className="w-4 h-4" />}
+            icon={<ArrowRight className="w-4 h-4" />}
           >
             العودة
           </Button>
@@ -132,34 +133,34 @@ export default function EditForm() {
         <Card className="p-6">
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 عنوان النموذج
               </label>
               <input
                 type="text"
                 value={form.title_arabic}
                 onChange={(e) => setForm({ ...form, title_arabic: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 required
                 disabled={isSaving}
               />
             </div>
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 وصف النموذج
               </label>
               <textarea
                 value={form.description_arabic}
                 onChange={(e) => setForm({ ...form, description_arabic: e.target.value })}
                 rows={5}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none"
                 disabled={isSaving}
               />
             </div>
 
-            <div className="bg-slate-800 p-4 rounded-lg">
-              <p className="text-gray-300 text-sm">
+            <div className="bg-white p-4 rounded-lg">
+              <p className="text-slate-600 text-sm">
                 لتعديل الأسئلة، يرجى استخدام واجهة المعلم المتخصصة
               </p>
             </div>

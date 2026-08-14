@@ -157,7 +157,7 @@ export default function TeacherFormsPage() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="min-h-screen p-6"
+        className="page-container min-h-screen"
       >
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -167,11 +167,11 @@ export default function TeacherFormsPage() {
             className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8"
           >
             <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+              <h1 className="text-2xl md:text-4xl font-bold text-ink mb-2 flex items-center gap-3">
                 <FileText className="w-6 h-6 md:w-10 md:h-10 text-primary" />
                 نماذجي
               </h1>
-              <p className="text-gray-200 text-sm md:text-base">إدارة النماذج التي قمت بإنشائها</p>
+              <p className="text-slate-700 text-sm md:text-base">إدارة النماذج التي قمت بإنشائها</p>
             </div>
             <div className="flex gap-2 md:gap-3 w-full md:w-auto">
               <Button
@@ -204,7 +204,7 @@ export default function TeacherFormsPage() {
             >
               <Card>
                 <div className="flex justify-between items-center mb-4 md:mb-6">
-                  <h3 className="text-lg md:text-2xl font-bold text-white">تعديل النموذج</h3>
+                  <h3 className="text-lg md:text-2xl font-bold text-ink">تعديل النموذج</h3>
                   <Button
                     onClick={() => {
                       setShowEditForm(false)
@@ -213,6 +213,7 @@ export default function TeacherFormsPage() {
                     variant="ghost"
                     size="sm"
                     icon={<X className="w-4 h-4" />}
+                    aria-label="إلغاء التعديل"
                   >
                     <span className="hidden sm:inline">إلغاء</span>
                   </Button>
@@ -235,27 +236,28 @@ export default function TeacherFormsPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+              className="dialog-backdrop"
               onClick={() => setViewingForm(null)}
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-slate-900 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+                className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
               >
-                <div className="bg-gradient-to-r from-primary/20 to-secondary/20 p-6 border-b border-slate-700">
+                <div className="bg-white   p-6 border-b border-slate-200">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-2xl font-bold text-white mb-1">{viewingForm.title_arabic}</h2>
-                      <p className="text-gray-300 text-sm mb-2">{viewingForm.story_title}</p>
-                      <p className="text-gray-400 text-xs">{viewingForm.description_arabic}</p>
+                      <h2 className="text-2xl font-bold text-ink mb-1">{viewingForm.title_arabic}</h2>
+                      <p className="text-slate-600 text-sm mb-2">{viewingForm.story_title}</p>
+                      <p className="text-slate-500 text-xs">{viewingForm.description_arabic}</p>
                     </div>
                     <Button
                       onClick={() => setViewingForm(null)}
                       variant="ghost"
                       size="sm"
                       icon={<X className="w-4 h-4" />}
+                      aria-label="إغلاق النافذة"
                     >
                       إغلاق
                     </Button>
@@ -265,30 +267,30 @@ export default function TeacherFormsPage() {
                 <div className="p-6 overflow-y-auto flex-1">
                   <div className="space-y-4">
                     {viewingForm.questions.map((question: any, index: number) => (
-                      <div key={question.id || index} className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                      <div key={question.id || index} className="bg-white p-4 rounded-lg border border-slate-200">
                         <div className="flex items-start gap-3">
-                          <div className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center font-bold flex-shrink-0">
+                          <div className="bg-primary text-ink rounded-full w-8 h-8 flex items-center justify-center font-bold flex-shrink-0">
                             {index + 1}
                           </div>
                           <div className="flex-1">
-                            <p className="text-white font-semibold mb-2">{question.text_arabic}</p>
+                            <p className="text-ink font-semibold mb-2">{question.text_arabic}</p>
                             <div className="flex items-center gap-3 text-sm">
                               <span className={`px-2 py-1 rounded text-xs ${
-                                question.type === 'multiple_choice' ? 'bg-blue-500/20 text-blue-300' :
-                                question.type === 'short_answer' ? 'bg-green-500/20 text-green-300' :
-                                'bg-purple-500/20 text-purple-300'
+                                question.type === 'multiple_choice' ? 'bg-primary-50 text-primary-700' :
+                                question.type === 'short_answer' ? 'bg-emerald-50 text-emerald-700' :
+                                'bg-secondary-50 text-secondary-700'
                               }`}>
                                 {question.type === 'multiple_choice' ? 'اختيار من متعدد' :
                                  question.type === 'short_answer' ? 'إجابة قصيرة' : 'إجابة طويلة'}
                               </span>
                               {question.required && (
-                                <span className="text-red-400 text-xs">مطلوب *</span>
+                                <span className="text-rose-700 text-xs">مطلوب *</span>
                               )}
                             </div>
                             {question.options && question.options.length > 0 && (
                               <div className="mt-3 space-y-2">
                                 {question.options.map((option: string, optIndex: number) => (
-                                  <div key={optIndex} className="text-sm text-gray-300 bg-slate-900/50 p-2 rounded">
+                                  <div key={optIndex} className="text-sm text-slate-600 bg-white p-2 rounded">
                                     {String.fromCharCode(65 + optIndex)}. {option}
                                   </div>
                                 ))}
@@ -313,16 +315,16 @@ export default function TeacherFormsPage() {
             {isLoading ? (
               <Card>
                 <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-pulse" />
-                  <p className="text-gray-200">جاري التحميل...</p>
+                  <FileText className="w-16 h-16 text-slate-500 mx-auto mb-4 animate-pulse" />
+                  <p className="text-slate-700">جاري التحميل...</p>
                 </div>
               </Card>
             ) : forms.length === 0 ? (
               <Card>
                 <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-white mb-2">لا توجد نماذج حتى الآن</h3>
-                  <p className="text-gray-200 mb-6">ابدأ بإنشاء نموذج جديد!</p>
+                  <FileText className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-ink mb-2">لا توجد نماذج حتى الآن</h3>
+                  <p className="text-slate-700 mb-6">ابدأ بإنشاء نموذج جديد!</p>
                   <Button
                     onClick={() => router.push('/teacher/forms/create')}
                     variant="primary"
@@ -341,37 +343,37 @@ export default function TeacherFormsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    <Card className="hover:shadow-lg transition-all h-full flex flex-col">
+                    <Card className="flex h-full flex-col transition-shadow hover:shadow-lg">
                       {/* Form Header */}
-                      <div className="bg-gradient-to-r from-primary/20 to-blue-600/20 p-3 md:p-4 rounded-t-lg -m-6 mb-4">
+                      <div className="bg-white   p-3 md:p-4 rounded-t-lg -m-6 mb-4">
                         <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-primary mb-2" />
-                        <h3 className="text-base md:text-xl font-bold text-white mb-1 line-clamp-2">{form.title_arabic}</h3>
-                        <p className="text-xs md:text-sm text-gray-300 truncate">{form.story_title}</p>
+                        <h3 className="text-base md:text-xl font-bold text-ink mb-1 line-clamp-2">{form.title_arabic}</h3>
+                        <p className="text-xs md:text-sm text-slate-600 truncate">{form.story_title}</p>
                       </div>
 
                       {/* Form Info */}
                       <div className="flex-1 mb-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-gray-300 text-xs md:text-sm">عدد الأسئلة</span>
+                          <span className="text-slate-600 text-xs md:text-sm">عدد الأسئلة</span>
                           <span className="text-primary font-bold text-base md:text-lg">{form.questions?.length || 0}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs md:text-sm text-gray-400">
+                        <div className="flex items-center gap-2 text-xs md:text-sm text-slate-500">
                           <Calendar className="w-3 h-3 md:w-4 md:h-4" />
                           <span>{new Date(form.created_at).toLocaleDateString('ar-SA')}</span>
                         </div>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex gap-2 pt-4 border-t border-slate-700">
+                      <div className="flex gap-2 pt-4 border-t border-slate-200">
                         <Button
                           onClick={() => setViewingForm(form)}
                           variant="success"
                           size="sm"
                           icon={<Eye className="w-3 h-3 md:w-4 md:h-4" />}
                           className="flex-1 text-xs md:text-sm"
+                          aria-label={`عرض نموذج ${form.title_arabic}`}
                         >
                           <span className="hidden sm:inline">عرض</span>
-                          <span className="sm:hidden">👁️</span>
                         </Button>
                         <Button
                           onClick={() => handleEdit(form)}
@@ -388,9 +390,9 @@ export default function TeacherFormsPage() {
                           size="sm"
                           icon={<Trash2 className="w-3 h-3 md:w-4 md:h-4" />}
                           className="text-xs md:text-sm"
+                          aria-label={`حذف نموذج ${form.title_arabic}`}
                         >
                           <span className="hidden sm:inline">حذف</span>
-                          <span className="sm:hidden">🗑️</span>
                         </Button>
                       </div>
                     </Card>
@@ -482,7 +484,7 @@ function EditFormTemplate({ form, onSuccess }: { form: FormTemplate; onSuccess: 
 
       if (error) throw error
 
-      toast.success('تم تعديل النموذج بنجاح! 🎉')
+      toast.success('تم تعديل النموذج بنجاح! ')
       onSuccess()
     } catch (error: any) {
       console.error('Error updating form:', error)
@@ -497,23 +499,23 @@ function EditFormTemplate({ form, onSuccess }: { form: FormTemplate; onSuccess: 
       {/* Title and Description */}
       <div className="space-y-4">
         <div>
-          <label className="block text-gray-300 font-semibold mb-2">عنوان النموذج</label>
+          <label className="block text-slate-600 font-semibold mb-2">عنوان النموذج</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+            className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
             required
           />
         </div>
 
         <div>
-          <label className="block text-gray-300 font-semibold mb-2">الوصف</label>
+          <label className="block text-slate-600 font-semibold mb-2">الوصف</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none"
+            className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none"
             required
           />
         </div>
@@ -522,7 +524,7 @@ function EditFormTemplate({ form, onSuccess }: { form: FormTemplate; onSuccess: 
       {/* Questions List */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h4 className="text-lg font-bold text-white">الأسئلة</h4>
+          <h4 className="text-lg font-bold text-ink">الأسئلة</h4>
           <Button
             type="button"
             onClick={handleAddQuestion}
@@ -534,7 +536,7 @@ function EditFormTemplate({ form, onSuccess }: { form: FormTemplate; onSuccess: 
         </div>
 
         {questions.map((question, index) => (
-          <div key={index} className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+          <div key={index} className="bg-white p-4 rounded-lg border border-slate-200">
             {editingQuestionIndex === index ? (
               <EditQuestionForm
                 question={question}
@@ -544,17 +546,17 @@ function EditFormTemplate({ form, onSuccess }: { form: FormTemplate; onSuccess: 
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="text-white font-semibold">{question.text_arabic}</p>
+                  <p className="text-ink font-semibold">{question.text_arabic}</p>
                   <div className="flex gap-2 mt-2">
                     <span className={`px-2 py-1 rounded text-xs ${
-                      question.type === 'multiple_choice' ? 'bg-blue-500/20 text-blue-300' :
-                      question.type === 'short_answer' ? 'bg-green-500/20 text-green-300' :
-                      'bg-purple-500/20 text-purple-300'
+                      question.type === 'multiple_choice' ? 'bg-primary-50 text-primary-700' :
+                      question.type === 'short_answer' ? 'bg-emerald-50 text-emerald-700' :
+                      'bg-secondary-50 text-secondary-700'
                     }`}>
                       {question.type === 'multiple_choice' ? 'اختيار' :
                        question.type === 'short_answer' ? 'قصيرة' : 'طويلة'}
                     </span>
-                    {question.required && <span className="text-red-400 text-xs">مطلوب *</span>}
+                    {question.required && <span className="text-rose-700 text-xs">مطلوب *</span>}
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -630,7 +632,7 @@ function EditQuestionForm({ question, onSave, onCancel }: {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="نص السؤال"
-        className="w-full px-3 py-2 border border-slate-600 rounded bg-slate-900 text-white text-sm"
+        className="w-full px-3 py-2 border border-slate-200 rounded bg-white text-ink text-sm"
         required
       />
       
@@ -638,14 +640,14 @@ function EditQuestionForm({ question, onSave, onCancel }: {
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="px-3 py-2 border border-slate-600 rounded bg-slate-900 text-white text-sm"
+          className="px-3 py-2 border border-slate-200 rounded bg-white text-ink text-sm"
         >
           <option value="short_answer">إجابة قصيرة</option>
           <option value="long_answer">إجابة طويلة</option>
           <option value="multiple_choice">اختيار من متعدد</option>
         </select>
 
-        <label className="flex items-center gap-2 text-sm text-gray-300">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={required}
@@ -658,7 +660,7 @@ function EditQuestionForm({ question, onSave, onCancel }: {
 
       {type === 'multiple_choice' && (
         <div className="space-y-2">
-          <label className="text-sm text-gray-300">الخيارات:</label>
+          <label className="text-sm text-slate-600">الخيارات:</label>
           {options.map((option: string, index: number) => (
             <input
               key={index}
@@ -670,7 +672,7 @@ function EditQuestionForm({ question, onSave, onCancel }: {
                 setOptions(newOptions)
               }}
               placeholder={`خيار ${index + 1}`}
-              className="w-full px-3 py-2 border border-slate-600 rounded bg-slate-900 text-white text-sm"
+              className="w-full px-3 py-2 border border-slate-200 rounded bg-white text-ink text-sm"
             />
           ))}
           <Button
@@ -686,11 +688,11 @@ function EditQuestionForm({ question, onSave, onCancel }: {
 
       {type === 'multiple_choice' && options.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm text-gray-300">الإجابة الصحيحة:</label>
+          <label className="text-sm text-slate-600">الإجابة الصحيحة:</label>
           <select
             value={correctAnswer}
             onChange={(e) => setCorrectAnswer(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-600 rounded bg-slate-900 text-white text-sm"
+            className="w-full px-3 py-2 border border-slate-200 rounded bg-white text-ink text-sm"
           >
             <option value="">اختر الإجابة الصحيحة</option>
             {options.map((option: string, idx: number) => (

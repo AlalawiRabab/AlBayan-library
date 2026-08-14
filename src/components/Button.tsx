@@ -3,20 +3,20 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-secondary focus:ring-offset-2 active:scale-95',
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-transparent font-bold leading-none shadow-sm transition-[color,background-color,border-color,box-shadow,transform] duration-200 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:ring-offset-2 active:translate-y-px',
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-white hover:bg-blue-600 active:bg-blue-700',
-        secondary: 'bg-secondary text-ink hover:bg-yellow-500 active:bg-yellow-600',
-        success: 'bg-accent-green text-white hover:bg-green-600 active:bg-green-700',
-        danger: 'bg-accent-red text-white hover:bg-red-600 active:bg-red-700',
-        outline: 'border-2 border-primary text-white hover:bg-blue-600/20 active:bg-blue-600/30',
-        ghost: 'text-white hover:bg-gray-800 active:bg-gray-700',
+        primary: 'bg-primary text-white hover:-translate-y-0.5 hover:bg-primary-600 hover:shadow-hover active:bg-primary-700',
+        secondary: 'bg-secondary text-white hover:-translate-y-0.5 hover:bg-secondary-600 active:bg-secondary-700',
+        success: 'bg-success text-white hover:-translate-y-0.5 hover:bg-emerald-700 active:bg-emerald-800',
+        danger: 'bg-error text-white hover:bg-rose-700 active:bg-rose-800',
+        outline: 'border-primary/35 bg-white text-primary-700 hover:border-primary hover:bg-primary-50',
+        ghost: 'border-transparent bg-transparent text-slate-600 shadow-none hover:bg-slate-100 hover:text-ink',
       },
       size: {
-        xs: 'px-3 py-1 text-xs',
-        sm: 'px-4 py-2 text-sm',
+        xs: 'min-h-11 px-3 py-2 text-xs',
+        sm: 'min-h-11 px-4 py-2 text-sm',
         md: 'px-6 py-3 text-base min-h-[44px]',
         lg: 'px-8 py-4 text-lg min-h-[54px]',
         xl: 'px-10 py-5 text-xl min-h-[64px]',

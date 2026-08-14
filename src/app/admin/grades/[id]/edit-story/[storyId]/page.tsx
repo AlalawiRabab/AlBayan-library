@@ -8,12 +8,12 @@ import { supabase } from '@/lib/supabase'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowRight, Save } from 'lucide-react'
 
 export default function EditStory() {
   const router = useRouter()
   const params = useParams()
-  const { userRole } = useAppStore()
+  const { userRole, hydrated } = useAppStore()
   const gradeId = params.id as string
   const storyId = params.storyId as string
   
@@ -26,12 +26,13 @@ export default function EditStory() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
+    if (!hydrated) return
     if (userRole !== 'admin') {
       router.push('/')
       return
     }
     loadStory()
-  }, [userRole, router, storyId])
+  }, [hydrated, userRole, router, storyId])
 
   const loadStory = async () => {
     try {
@@ -85,7 +86,7 @@ export default function EditStory() {
 
       if (error) throw error
 
-      toast.success('تم تحديث القصة بنجاح! 🎉')
+      toast.success('تم تحديث القصة بنجاح! ')
       router.push(`/admin/grades/${gradeId}`)
     } catch (error) {
       console.error('Error updating story:', error)
@@ -100,23 +101,23 @@ export default function EditStory() {
       <div className="min-h-screen bg-cloud flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-gray-300 mt-4">جاري تحميل القصة...</p>
+          <p className="text-slate-600 mt-4">جاري تحميل القصة...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-cloud p-4 md:p-6">
+    <div className="page-container min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">تعديل القصة</h1>
+          <h1 className="text-3xl font-bold text-ink">تعديل القصة</h1>
           <Button
             onClick={() => router.push(`/admin/grades/${gradeId}`)}
             variant="ghost"
             size="md"
-            icon={<ArrowLeft className="w-4 h-4" />}
+            icon={<ArrowRight className="w-4 h-4" />}
           >
             العودة
           </Button>
@@ -126,41 +127,41 @@ export default function EditStory() {
         <Card className="p-6">
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 عنوان القصة
               </label>
               <input
                 type="text"
                 value={story.title_arabic}
                 onChange={(e) => setStory({ ...story, title_arabic: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 required
                 disabled={isSaving}
               />
             </div>
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 محتوى القصة
               </label>
               <textarea
                 value={story.content_arabic}
                 onChange={(e) => setStory({ ...story, content_arabic: e.target.value })}
                 rows={15}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none font-arabic"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none font-arabic"
                 required
                 disabled={isSaving}
               />
             </div>
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 مستوى الصعوبة
               </label>
               <select
                 value={story.difficulty}
                 onChange={(e) => setStory({ ...story, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 disabled={isSaving}
               >
                 <option value="easy">سهل</option>

@@ -8,12 +8,13 @@ import { useRouter } from 'next/navigation'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import LoadingState from '@/components/LoadingState'
 import { useAppStore } from '@/lib/store'
 import { adminService, supabase } from '@/lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { 
   Users, 
-  ArrowLeft, 
+  ArrowRight,
   Plus,
   Edit,
   Trash2,
@@ -38,7 +39,7 @@ interface Teacher {
 
 export default function AdminTeacherManagement() {
   const router = useRouter()
-  const { user, userRole } = useAppStore()
+  const { user, userRole, hydrated } = useAppStore()
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
@@ -53,12 +54,13 @@ export default function AdminTeacherManagement() {
   const [isSavingName, setIsSavingName] = useState(false)
 
   useEffect(() => {
+    if (!hydrated) return
     if (userRole !== 'admin') {
       router.push('/')
       return
     }
     loadTeachers()
-  }, [userRole, router])
+  }, [hydrated, userRole, router])
 
   const loadTeachers = async () => {
     try {
@@ -111,7 +113,7 @@ export default function AdminTeacherManagement() {
 
       await adminService.createTeacher(teacherData)
 
-      toast.success('تم إنشاء حساب المعلم بنجاح! 🎉')
+      toast.success('تم إنشاء حساب المعلم بنجاح! ')
       setShowCreateForm(false)
       setNewTeacher({ name: '', assigned_grade: 3, permission_level: 'full_access' })
       loadTeachers()
@@ -198,7 +200,7 @@ export default function AdminTeacherManagement() {
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen p-4 md:p-6" dir="rtl">
+      <div className="page-container min-h-screen" dir="rtl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -207,11 +209,11 @@ export default function AdminTeacherManagement() {
           {/* Header */}
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 md:mb-8">
             <div className="flex-1">
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-2 flex items-center gap-2 md:gap-3">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-ink mb-2 flex items-center gap-2 md:gap-3">
                 <Users className="w-8 h-8 md:w-10 md:h-10 text-primary flex-shrink-0" />
                 إدارة المعلمين
               </h1>
-              <p className="text-gray-300 text-sm md:text-lg font-semibold">
+              <p className="text-slate-600 text-sm md:text-lg font-semibold">
                 إدارة حسابات المعلمين والصلاحيات
               </p>
             </div>
@@ -229,7 +231,7 @@ export default function AdminTeacherManagement() {
                 onClick={() => router.back()}
                 variant="ghost"
                 size="sm"
-                icon={<ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />}
+                icon={<ArrowRight className="w-4 h-4 md:w-5 md:h-5" />}
               >
                 العودة
               </Button>
@@ -244,11 +246,11 @@ export default function AdminTeacherManagement() {
               className="mb-8"
             >
               <Card>
-                <h3 className="text-2xl font-bold text-white mb-6">إضافة معلم جديد</h3>
+                <h3 className="text-2xl font-bold text-ink mb-6">إضافة معلم جديد</h3>
                 <form onSubmit={createTeacher}>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
+                      <label className="block text-slate-600 font-semibold mb-2">
                         اسم المعلم
                       </label>
                         <input
@@ -258,14 +260,14 @@ export default function AdminTeacherManagement() {
                             setNewTeacher({ ...newTeacher, name: e.target.value })
                           }
                         placeholder="مثال: معلمة الصف الثالث"
-                        className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                         disabled={isCreating}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
+                      <label className="block text-slate-600 font-semibold mb-2">
                         الصف الدراسي
                       </label>
                       <select
@@ -273,7 +275,7 @@ export default function AdminTeacherManagement() {
                         onChange={(e) =>
                           setNewTeacher({ ...newTeacher, assigned_grade: parseInt(e.target.value) })
                         }
-                        className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                         disabled={isCreating}
                       >
                         <option value={1}>الصف الأول</option>
@@ -292,7 +294,7 @@ export default function AdminTeacherManagement() {
                     </div>
 
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
+                      <label className="block text-slate-600 font-semibold mb-2">
                         مستوى الصلاحية
                       </label>
                       <select
@@ -300,7 +302,7 @@ export default function AdminTeacherManagement() {
                         onChange={(e) =>
                           setNewTeacher({ ...newTeacher, permission_level: e.target.value })
                         }
-                        className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                         disabled={isCreating}
                       >
                         <option value="full_access">صلاحية كاملة</option>
@@ -340,22 +342,19 @@ export default function AdminTeacherManagement() {
           {/* Teachers List */}
           <Card className="p-4 md:p-6">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-0 mb-4 md:mb-6">
-              <h2 className="text-xl md:text-2xl font-bold text-white">قائمة المعلمين</h2>
-              <div className="text-gray-300 text-sm md:text-base font-semibold">
+              <h2 className="text-xl md:text-2xl font-bold text-ink">قائمة المعلمين</h2>
+              <div className="text-slate-600 text-sm md:text-base font-semibold">
                 إجمالي المعلمين: {teachers.length}
               </div>
             </div>
 
             {isLoading ? (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4 animate-spin">⏳</div>
-                <p className="text-xl text-gray-400">جاري التحميل...</p>
-              </div>
+              <LoadingState />
             ) : teachers.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="w-20 h-20 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-white mb-2">لا يوجد معلمون</h3>
-                <p className="text-gray-400">ابدأ بإضافة معلم جديد</p>
+                <h3 className="text-2xl font-bold text-ink mb-2">لا يوجد معلمون</h3>
+                <p className="text-slate-500">ابدأ بإضافة معلم جديد</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -365,10 +364,10 @@ export default function AdminTeacherManagement() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className={`p-4 md:p-6 rounded-lg border-2 transition-all ${
+                    className={`rounded-lg border-2 p-4 transition-[border-color,background-color,box-shadow] md:p-6 ${
                       teacher.is_active
-                        ? 'border-slate-700 bg-slate-800/50'
-                        : 'border-red-500/50 bg-red-900/20'
+                        ? 'border-slate-200 bg-white'
+                        : 'border-rose-200/50 bg-red-900/20'
                     }`}
                   >
                     <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
@@ -381,7 +380,7 @@ export default function AdminTeacherManagement() {
                                 type="text"
                                 value={editingName}
                                 onChange={(e) => setEditingName(e.target.value)}
-                                className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg border-2 border-slate-600 bg-slate-800 text-white font-bold text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg border-2 border-slate-200 bg-white text-ink font-bold text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-primary"
                                 placeholder="اسم المعلم"
                                 disabled={isSavingName}
                                 dir="rtl"
@@ -405,7 +404,7 @@ export default function AdminTeacherManagement() {
                             </div>
                           ) : (
                             <>
-                              <h3 className="text-base md:text-xl font-bold text-white truncate">
+                              <h3 className="text-base md:text-xl font-bold text-ink truncate">
                                 {teacher.name}
                               </h3>
                               <Button
@@ -415,14 +414,14 @@ export default function AdminTeacherManagement() {
                                 icon={<Edit className="w-3 h-3 md:w-4 md:h-4" />}
                                 title="تعديل الاسم"
                               >
-                                <span className="sr-only md:not-sr-only md:mr-1">تعديل الاسم</span>
+                                <span className="sr-only md:not-sr-only md:me-1">تعديل الاسم</span>
                               </Button>
                             </>
                           )}
                           <span className={`px-2 py-1 rounded-full text-xs md:text-sm font-bold flex-shrink-0 ${
                             teacher.is_active
-                              ? 'bg-accent-green text-white'
-                              : 'bg-accent-red text-white'
+                              ? 'bg-accent-green text-ink'
+                              : 'bg-accent-red text-ink'
                           }`}>
                             {teacher.is_active ? 'نشط' : 'غير نشط'}
                           </span>
@@ -430,25 +429,25 @@ export default function AdminTeacherManagement() {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 text-xs md:text-sm">
                           <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-300">الصلاحية:</span>
-                            <span className="text-white font-semibold">
+                            <Shield className="w-4 h-4 text-slate-500" />
+                            <span className="text-slate-600">الصلاحية:</span>
+                            <span className="text-ink font-semibold">
                               {teacher.permission_level === 'full_access' ? 'كاملة' :
                                teacher.permission_level === 'limited_access' ? 'محدودة' :
                                teacher.permission_level === 'read_only' ? 'قراءة فقط' : 'بدون صلاحية'}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-300">الصف:</span>
-                            <span className="text-white font-semibold">
+                            <Calendar className="w-4 h-4 text-slate-500" />
+                            <span className="text-slate-600">الصف:</span>
+                            <span className="text-ink font-semibold">
                               الصف {teacher.assigned_grade}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-300">آخر دخول:</span>
-                            <span className="text-white font-semibold text-xs md:text-sm">
+                            <Activity className="w-4 h-4 text-slate-500" />
+                            <span className="text-slate-600">آخر دخول:</span>
+                            <span className="text-ink font-semibold text-xs md:text-sm">
                               {teacher.last_login_at
                                 ? new Date(teacher.last_login_at).toLocaleString('ar-SA', {
                                     dateStyle: 'short',
@@ -459,12 +458,12 @@ export default function AdminTeacherManagement() {
                           </div>
                         </div>
 
-                        <div className="mt-3 md:mt-4 p-2 md:p-3 bg-slate-900 rounded-lg">
+                        <div className="mt-3 md:mt-4 p-2 md:p-3 bg-white rounded-lg">
                           <div className="flex items-center gap-2 mb-2">
-                            <span className="text-gray-400 text-xs md:text-sm font-semibold">رمز الوصول:</span>
+                            <span className="text-slate-500 text-xs md:text-sm font-semibold">رمز الوصول:</span>
                           </div>
                           <div className="flex items-center gap-2 overflow-x-auto">
-                            <code className="bg-slate-800 px-2 md:px-3 py-1 md:py-2 rounded text-primary font-mono text-sm md:text-lg">
+                            <code dir="ltr" className="rounded bg-white px-2 py-1 font-mono text-sm text-primary md:px-3 md:py-2 md:text-lg">
                               {teacher.access_code}
                             </code>
                             <Button

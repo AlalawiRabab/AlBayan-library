@@ -60,7 +60,7 @@ SELECT last_login_at, login_count FROM teachers;
 
 ### تسجيل دخول تجريبي:
 ```sql
-SELECT authenticate_user('TEACH4A2025ZXVN');
+SELECT authenticate_user('TEACHER_ACCESS_CODE');
 ```
 
 ### بعد الإصلاح:
@@ -78,7 +78,7 @@ SELECT
   last_login_at,
   login_count
 FROM teachers
-WHERE access_code = 'TEACH4A2025ZXVN';
+WHERE access_code = 'TEACHER_ACCESS_CODE';
 ```
 
 **النتيجة:**

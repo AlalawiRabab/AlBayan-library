@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
@@ -9,8 +10,10 @@ import { useAppStore } from '@/lib/store'
 import { authService } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import toast, { Toaster } from 'react-hot-toast'
-import { Shield, GraduationCap, LogIn, UserCheck, X, ArrowRight } from 'lucide-react'
+import { Shield, GraduationCap, LogIn, UserCheck, ArrowRight } from 'lucide-react'
 import { showPageLoader } from '@/components/PageTransitionLoader'
+import Dialog from '@/components/Dialog'
+import { FormField, TextInput } from '@/components/FormField'
 
 export default function AccessPortalPage() {
   const router = useRouter()
@@ -30,11 +33,11 @@ export default function AccessPortalPage() {
       setUser(result.user, result.type)
       
       if (result.type === 'admin') {
-        toast.success('مرحباً أيها المسؤول! 👨‍💼')
+        toast.success('مرحباً أيها المسؤول! ')
         showPageLoader()
         router.push('/admin')
       } else if (result.type === 'teacher') {
-        toast.success(`مرحباً ${result.user.name}! 👩‍🏫`)
+        toast.success(`مرحباً ${result.user.name}! `)
         showPageLoader()
         router.push('/teacher')
       } else {
@@ -54,26 +57,29 @@ export default function AccessPortalPage() {
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen flex items-center justify-center p-4" dir="rtl">
+      <div className="flex min-h-screen w-full items-center justify-center px-4 py-10 sm:px-6" dir="rtl">
         <div className="max-w-4xl w-full">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-8"
+            className="mb-8 text-center"
           >
             <div className="flex flex-col items-center gap-2 mb-4">
-              <img 
+              <Image
                 src="/logow.png" 
                 alt="البيان" 
-                className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-2xl"
+                width={192}
+                height={112}
+                priority
+                className="h-24 w-40 object-contain md:h-28 md:w-48"
               />
-              <h1 className="text-3xl md:text-5xl font-bold text-white">
+              <h1 className="font-heading text-3xl font-extrabold text-ink md:text-4xl">
                 بوابة الإدارة
               </h1>
             </div>
-            <p className="text-gray-300 text-lg">
+            <p className="text-slate-600 text-lg">
               دخول المسؤولين والمعلمين
             </p>
           </motion.div>
@@ -86,10 +92,10 @@ export default function AccessPortalPage() {
             className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
           >
             {/* Admin Login */}
-            <Card className="p-6 md:p-8 text-center hover:scale-105 transition-transform duration-200">
+            <Card className="p-6 text-center md:p-8" variant="interactive">
               <Shield className="w-16 h-16 md:w-20 md:h-20 text-primary mx-auto mb-4" />
-              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">دخول المسؤول</h3>
-              <p className="text-gray-300 mb-4 text-base">إدارة النظام والمعلمين</p>
+              <h3 className="text-xl md:text-2xl font-bold text-ink mb-2">دخول المسؤول</h3>
+              <p className="text-slate-600 mb-4 text-base">إدارة النظام والمعلمين</p>
               <Button
                 onClick={() => {
                   setLoginType('admin')
@@ -105,10 +111,10 @@ export default function AccessPortalPage() {
             </Card>
 
             {/* Teacher Login */}
-            <Card className="p-6 md:p-8 text-center hover:scale-105 transition-transform duration-200">
+            <Card className="p-6 text-center md:p-8" variant="interactive">
               <GraduationCap className="w-16 h-16 md:w-20 md:h-20 text-secondary mx-auto mb-4" />
-              <h3 className="text-xl md:text-2xl font-bold text-white mb-2">دخول المعلم</h3>
-              <p className="text-gray-300 mb-4 text-base">إدارة الطلاب والقصص</p>
+              <h3 className="text-xl md:text-2xl font-bold text-ink mb-2">دخول المعلم</h3>
+              <p className="text-slate-600 mb-4 text-base">إدارة الطلاب والقصص</p>
               <Button
                 onClick={() => {
                   setLoginType('teacher')
@@ -144,60 +150,21 @@ export default function AccessPortalPage() {
             </Button>
           </motion.div>
 
-          {/* Login Form Modal */}
-          {showLoginForm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-              onClick={() => setShowLoginForm(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-slate-800 rounded-xl p-6 md:p-8 w-full max-w-md"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    {loginType === 'admin' ? (
-                      <>
-                        <Shield className="w-8 h-8 text-primary" />
-                        <h2 className="text-2xl font-bold text-white">دخول المسؤول</h2>
-                      </>
-                    ) : (
-                      <>
-                        <GraduationCap className="w-8 h-8 text-secondary" />
-                        <h2 className="text-2xl font-bold text-white">دخول المعلم</h2>
-                      </>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setShowLoginForm(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-
+          <Dialog open={showLoginForm} onOpenChange={setShowLoginForm} title={loginType === 'admin' ? 'دخول المسؤول' : 'دخول المعلم'} description="استخدم رمز الوصول الخاص بحسابك." size="sm">
                 <form onSubmit={handleLogin} className="space-y-6">
-                  <div>
-                    <label className="block text-white font-semibold mb-2 text-lg">
-                      رمز الدخول
-                    </label>
-                    <input
+                  <FormField id="staff-access-code" label="رمز الدخول" required>
+                    <TextInput
+                      id="staff-access-code"
                       type="text"
                       value={accessCode}
                       onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-                      className="w-full px-4 py-3 border-2 border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-slate-900 text-white font-mono text-lg"
+                      className="ltr-isolate font-mono text-base font-bold tracking-wider"
                       placeholder="أدخل رمز الدخول"
                       maxLength={16}
                       required
                       disabled={isLoading}
                     />
-                  </div>
+                  </FormField>
 
                   <div className="flex gap-3">
                     <Button
@@ -221,9 +188,7 @@ export default function AccessPortalPage() {
                     </Button>
                   </div>
                 </form>
-              </motion.div>
-            </motion.div>
-          )}
+          </Dialog>
         </div>
       </div>
     </AnimatedBackground>

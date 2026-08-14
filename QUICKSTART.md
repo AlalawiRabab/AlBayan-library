@@ -16,10 +16,13 @@ Create `.env.local`:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-NEXT_PUBLIC_APP_NAME=المكتبة الإلكترونية للقصص
+GROQ_API_KEY=your_rotated_groq_api_key
+AUTO_GRADING_RPC_SECRET=your_high_entropy_server_secret
 ```
 
-Get these from your Supabase project settings → API keys
+Get the public Supabase values from project settings. Keep the Groq key and
+grading secret server-only; the grading secret must match the deployed Edge
+Function configuration.
 
 ## 3️⃣ Run Development Server (1 min)
 
@@ -32,11 +35,11 @@ Open: http://localhost:3000
 ## 4️⃣ Test With Demo Accounts (1 min)
 
 ### 👨‍💼 Admin
-- **Code**: `ADMIN2025`
+- **Code**: use the active admin code stored securely outside the repository
 - **Dashboard**: Full system control
 
 ### 👨‍🏫 Teacher  
-- **Code**: `TEACH3A2025` (Grade 3)
+- **Code**: use the assigned teacher code (Grade 3)
 - **Dashboard**: Student & content management
 
 ### 👦 Student
@@ -193,7 +196,7 @@ http://[your-ip]:3000
 ## 🔒 Security Notes
 
 - ✅ Never commit `.env.local`
-- ✅ Keep Supabase keys secret
+- ✅ Never expose service-role keys or server-only AI secrets
 - ✅ Always use RTL (dir="rtl")
 - ✅ Test RLS policies before deploy
 

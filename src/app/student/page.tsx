@@ -7,11 +7,14 @@ import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import StoryCard from '@/components/StoryCard'
+import StatCard from '@/components/StatCard'
+import EmptyState from '@/components/EmptyState'
 import { useAppStore } from '@/lib/store'
 import { storiesService, studentsService, supabase } from '@/lib/supabase'
 import { StudentClassroom } from '@/types'
 import toast, { Toaster } from 'react-hot-toast'
 import { showPageLoader } from '@/components/PageTransitionLoader'
+import { Award, BookOpen, FileCheck2, LibraryBig, Loader2, Sparkles, Target } from 'lucide-react'
 
 export default function StudentDashboard() {
   const router = useRouter()
@@ -142,20 +145,13 @@ export default function StudentDashboard() {
     router.push('/student/profile')
   }
 
-  const handleLogout = () => {
-    const { logout } = useAppStore.getState()
-    logout()
-    showPageLoader()
-    router.push('/')
-  }
-
   if (!hydrated || !isAuthenticated || isLoading) {
     return (
       <AnimatedBackground>
         <div className="w-full h-full flex items-center justify-center" dir="rtl">
           <div className="text-center">
-            <div className="text-6xl mb-4 animate-bounce">📚</div>
-            <p className="text-2xl font-bold text-white">جاري التحميل...</p>
+            <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-primary" />
+            <p className="text-2xl font-bold text-ink">جاري التحميل...</p>
           </div>
         </div>
       </AnimatedBackground>
@@ -167,93 +163,33 @@ export default function StudentDashboard() {
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen p-4 md:p-6" dir="rtl">
+      <div className="page-container min-h-screen" dir="rtl">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-7xl mx-auto mb-8"
+          className="mx-auto mb-7 max-w-7xl"
         >
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">
-                أهلاً {studentName} 👋
-              </h1>
-              <p className="text-gray-200 text-sm md:text-lg">رحباً بك في مكتبة القصص الحديثة</p>
+          <section className="relative mb-5 overflow-hidden rounded-3xl border border-primary-100 bg-white p-5 shadow-card sm:p-7">
+            <div className="absolute -start-8 -top-8 h-28 w-28 rounded-full border-[16px] border-primary-50" aria-hidden="true" />
+            <div className="relative flex flex-col justify-between gap-5 md:flex-row md:items-center">
+              <div>
+                <p className="mb-1 flex items-center gap-2 text-xs font-extrabold text-primary-700"><Sparkles className="h-4 w-4" />رحلة قراءة جديدة</p>
+                <h1 className="text-3xl font-black text-ink md:text-4xl">أهلاً {studentName}</h1>
+                <p className="mt-1 text-sm text-slate-600 md:text-base">مرحباً بك في مكتبة القصص الحديثة</p>
+              </div>
+              <div className="flex w-full gap-2 md:w-auto">
+                <Button onClick={() => { showPageLoader(); router.push('/leaderboard') }} variant="outline" size="sm" className="flex-1 md:flex-none">الترتيب</Button>
+                <Button onClick={() => { showPageLoader(); router.push('/student/submissions') }} variant="primary" size="sm" className="flex-1 md:flex-none">درجاتي</Button>
+              </div>
             </div>
-            <div className="flex gap-2 md:gap-3 w-full md:w-auto">
-              <Button
-                onClick={() => {
-                  showPageLoader()
-                  router.push('/leaderboard')
-                }}
-                variant="outline"
-                size="sm"
-                className="flex-1 md:flex-none"
-              >
-                الترتيب
-              </Button>
-              <Button
-                onClick={() => {
-                  showPageLoader()
-                  router.push('/student/submissions')
-                }}
-                variant="primary"
-                size="sm"
-                className="flex-1 md:flex-none"
-              >
-                درجاتي
-              </Button>
-              <Button
-                onClick={handleLogout}
-                variant="ghost"
-                size="sm"
-                className="flex-1 md:flex-none"
-              >
-                تسجيل خروج
-              </Button>
-            </div>
-          </div>
+          </section>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="text-center" elevation="sm">
-                <div className="text-5xl mb-2">📖</div>
-                <p className="text-gray-200 text-sm mb-1">القصص المقروءة</p>
-                <p className="text-3xl font-bold text-primary">{stats.storiesRead}</p>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="text-center" elevation="sm">
-                <div className="text-5xl mb-2">✏️</div>
-                <p className="text-gray-200 text-sm mb-1">النماذج المرسلة</p>
-                <p className="text-3xl font-bold text-accent-green">{stats.formsSubmitted}</p>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
-              onClick={handleViewProfile}
-              className="cursor-pointer"
-            >
-              <Card className="text-center hover:shadow-hover transition-all" elevation="sm">
-                <div className="text-5xl mb-2">👑</div>
-                <p className="text-gray-200 text-sm mb-1">إنجازك الحالي</p>
-                <p className="text-lg font-bold text-secondary">{stats.titleName}</p>
-              </Card>
-            </motion.div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard label="القصص المقروءة" value={stats.storiesRead} icon={<BookOpen className="h-6 w-6" />} />
+            <StatCard label="النماذج المرسلة" value={stats.formsSubmitted} icon={<FileCheck2 className="h-6 w-6" />} tone="success" />
+            <button type="button" onClick={handleViewProfile} className="min-h-0 rounded-2xl text-start"><StatCard label="إنجازك الحالي" value={stats.titleName} icon={<Award className="h-6 w-6" />} tone="gold" /></button>
           </div>
         </motion.div>
 
@@ -264,17 +200,17 @@ export default function StudentDashboard() {
             animate={{ opacity: 1, y: 0 }}
             className="max-w-7xl mx-auto mb-6"
           >
-            <p className="text-gray-200 text-sm mb-2">اختر الفصل</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="mb-2 text-sm font-extrabold text-slate-700">اختر الفصل</p>
+            <div className="flex snap-x gap-2 overflow-x-auto pb-2">
               {classrooms.map((c) => (
                 <button
                   key={c.classroom_id}
                   type="button"
                   onClick={() => setSelectedClassroomId(c.classroom_id)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`min-w-max snap-start rounded-xl border px-4 py-2 text-sm font-bold transition-[color,background-color,border-color,box-shadow] ${
                     selectedClassroomId === c.classroom_id
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      ? 'border-primary bg-primary text-white shadow-md'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50'
                   }`}
                 >
                   {[c.classroom_name || `الصف ${c.grade}`, c.teacher_name].filter(Boolean).join(' — ')}
@@ -291,17 +227,13 @@ export default function StudentDashboard() {
           transition={{ delay: 0.3 }}
           className="max-w-7xl mx-auto"
         >
-          <div className="mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">🌟 القصص المتاحة</h2>
-            <p className="text-gray-200 text-sm md:text-lg">اختر قصة واستمتع برحلة القراءة</p>
+          <div className="mb-5 flex items-end justify-between gap-4">
+            <div><h2 className="flex items-center gap-2 text-2xl font-black text-ink md:text-3xl"><LibraryBig className="h-7 w-7 text-primary" />القصص المتاحة</h2><p className="mt-1 text-sm text-slate-600 md:text-base">اختر قصة واستمتع برحلة القراءة</p></div>
+            <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-extrabold text-primary-700">{stories.length} قصة</span>
           </div>
 
           {stories.length === 0 ? (
-            <Card className="text-center py-12">
-              <div className="text-6xl mb-4">📚</div>
-              <h3 className="text-2xl font-bold text-white mb-2">لا توجد قصص متاحة حالياً</h3>
-              <p className="text-gray-200">يرجى الاتصال بمعلمك لإنشاء قصص جديدة</p>
-            </Card>
+            <EmptyState title="لا توجد قصص متاحة حالياً" description="يرجى التواصل مع معلمك لإضافة قصص جديدة" icon={<BookOpen className="h-6 w-6" />} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {stories.map((story, index) => (
@@ -327,18 +259,12 @@ export default function StudentDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="max-w-7xl mx-auto mt-12 mb-8"
+          className="mx-auto mb-8 mt-10 max-w-7xl"
         >
-            <Card
-            className="bg-gradient-to-r from-primary/20 to-secondary/20 text-center py-6 md:py-8"
-            elevation="md"
-          >
-            <div className="text-4xl md:text-5xl mb-3 md:mb-4">🎯</div>
-            <h3 className="text-xl md:text-2xl font-bold text-white mb-2">هدفك اليومي</h3>
-            <p className="text-gray-200 mb-4 text-sm md:text-base px-4">اقرأ قصة واحدة وأرسل نموذج لكسب نقاط!</p>
-            <Button size="md" variant="primary" className="text-sm md:text-base">
-              ابدأ الآن
-            </Button>
+          <Card variant="highlight" className="flex flex-col items-center gap-4 py-6 text-center md:flex-row md:text-start" elevation="sm">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-primary shadow-sm"><Target className="h-7 w-7" /></div>
+            <div className="flex-1"><h3 className="text-xl font-black text-ink md:text-2xl">هدفك اليومي</h3><p className="mt-1 text-sm text-slate-600 md:text-base">اقرأ قصة واحدة وأرسل نموذجاً لتتقدم في لوحة الترتيب.</p></div>
+            <Button size="md" variant="primary">ابدأ الآن</Button>
           </Card>
         </motion.div>
       </div>

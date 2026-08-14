@@ -1,16 +1,18 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import AnimatedBackground from '@/components/AnimatedBackground'
-import Button from '@/components/Button'
-import Card from '@/components/Card'
-import { useAppStore } from '@/lib/store'
-import { analyticsService } from '@/lib/supabase'
+import { Activity, BarChart3, BookOpen, FileText, GraduationCap, Settings, Shield, Users } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
-import { Users, Shield, BarChart3, Settings, FileText, LogOut, GraduationCap } from 'lucide-react'
+import AnimatedBackground from '@/components/AnimatedBackground'
+import Card from '@/components/Card'
+import PageHeader from '@/components/PageHeader'
+import StatCard from '@/components/StatCard'
 import { showPageLoader } from '@/components/PageTransitionLoader'
+import { analyticsService } from '@/lib/supabase'
+import { useAppStore } from '@/lib/store'
 
 interface AdminAnalytics {
   total_students: number
@@ -26,6 +28,13 @@ interface AdminAnalytics {
   total_classrooms: number
 }
 
+const adminItems = [
+  { href: '/admin/teachers', title: 'إدارة المعلمين', description: 'إنشاء حسابات المعلمين ومتابعة نشاطهم.', icon: Users, tone: 'bg-primary-50 text-primary-700' },
+  { href: '/admin/permissions', title: 'الأذونات', description: 'ضبط صلاحيات الوصول لكل معلم بأمان.', icon: Shield, tone: 'bg-secondary-50 text-secondary-700' },
+  { href: '/admin/analytics', title: 'التحليلات', description: 'عرض مؤشرات النظام والمدارس والفصول.', icon: BarChart3, tone: 'bg-violet-50 text-violet-700' },
+  { href: '/admin/grades', title: 'إدارة الصفوف', description: 'تنظيم الصفوف والمحتوى والمعلمين.', icon: GraduationCap, tone: 'bg-emerald-50 text-emerald-700' },
+] as const
+
 export default function AdminDashboard() {
   const router = useRouter()
   const { user, userRole, isAuthenticated, hydrated } = useAppStore()
@@ -38,298 +47,100 @@ export default function AdminDashboard() {
       router.replace('/')
       return
     }
-
-    loadAnalytics()
+    void loadAnalytics()
   }, [hydrated, isAuthenticated, userRole, router])
 
   const loadAnalytics = async () => {
     try {
       setIsLoading(true)
-      console.log('loadAnalytics called with user:', user)
-      
       if (!user || !('access_code' in user)) {
-        console.error('User access code is not available')
         toast.error('خطأ في بيانات المستخدم')
         return
       }
-      
-      const accessCode = (user as any).access_code as string
-      console.log('Loading admin analytics for access code:', accessCode)
-      
-      const analyticsData = await analyticsService.getAdminAnalytics(accessCode)
-      console.log('Loaded admin analytics:', analyticsData)
-
-      if (!analyticsData) {
-        console.error('No analytics data returned')
+      const data = await analyticsService.getAdminAnalytics((user as { access_code: string }).access_code)
+      if (!data) {
         toast.error('لا توجد بيانات متاحة')
         return
       }
-
-      console.log('Setting analytics data:', analyticsData)
-      console.log('Analytics data type:', typeof analyticsData)
-      console.log('Analytics data keys:', analyticsData ? Object.keys(analyticsData) : 'null')
-      setAnalytics(analyticsData)
+      setAnalytics(data)
     } catch (error) {
       console.error('Error loading admin analytics:', error)
-      console.error('Error details:', error)
       toast.error('حدث خطأ في تحميل البيانات')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleLogout = () => {
-    const { logout } = useAppStore.getState()
-    logout()
-    showPageLoader()
-    router.push('/')
-  }
-
-  const adminName = (user as any)?.name || 'مسؤول'
+  const adminName = (user as { name?: string } | null)?.name || 'المسؤول'
+  const loadingValue = <span className="inline-block h-7 w-12 animate-pulse rounded-lg bg-slate-200" aria-label="جارٍ التحميل" />
 
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen p-4 md:p-6 relative z-10" dir="rtl">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-7xl mx-auto relative z-10"
-        >
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
-                <Shield className="w-10 h-10 text-primary" />
-                لوحة تحكم الإدارة
-              </h1>
-              <p className="text-gray-300 text-lg font-semibold">مرحبا {adminName}</p>
+      <main className="page-container min-h-screen" dir="rtl">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-7xl">
+          <PageHeader
+            eyebrow="إدارة النظام"
+            title="لوحة تحكم الإدارة"
+            description={`مرحباً ${adminName}، راقب النظام وأدر الصلاحيات والمحتوى من لوحة واضحة وآمنة.`}
+            icon={<Shield className="h-6 w-6" />}
+          />
+
+          <section aria-labelledby="system-stats-title" className="mb-8">
+            <h2 id="system-stats-title" className="sr-only">إحصاءات النظام</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="المعلمون" value={isLoading ? loadingValue : analytics?.total_teachers || 0} icon={<GraduationCap className="h-6 w-6" />} />
+              <StatCard label="الطلاب" value={isLoading ? loadingValue : analytics?.total_students || 0} icon={<Users className="h-6 w-6" />} tone="success" />
+              <StatCard label="القصص" value={isLoading ? loadingValue : analytics?.total_stories || 0} icon={<BookOpen className="h-6 w-6" />} tone="secondary" />
+              <StatCard label="النشاط اليومي" value={isLoading ? loadingValue : analytics?.daily_activity || 0} icon={<Activity className="h-6 w-6" />} tone="gold" />
             </div>
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              size="md"
-              icon={<LogOut className="w-5 h-5" />}
-            >
-              تسجيل خروج
-            </Button>
-          </div>
+          </section>
 
-          {/* System Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="text-center relative z-20" elevation="sm">
-                <div className="text-5xl mb-2">👨‍🏫</div>
-                <p className="text-gray-600 text-sm mb-1">المعلمون</p>
-                {isLoading ? (
-                  <div className="animate-pulse bg-gray-300 h-8 w-12 mx-auto rounded"></div>
-                ) : (
-                  <p className="text-3xl font-bold text-primary">{analytics?.total_teachers || 0}</p>
-                )}
-              </Card>
-            </motion.div>
+          <section aria-labelledby="admin-tools-title">
+            <div className="mb-4">
+              <h2 id="admin-tools-title" className="text-xl font-black text-ink sm:text-2xl">إدارة المنصة</h2>
+              <p className="mt-1 text-sm text-slate-600">اختصارات واضحة للمهام الإدارية اليومية.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {adminItems.map((item, index) => {
+                const Icon = item.icon
+                return (
+                  <motion.div key={item.href} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
+                    <Link href={item.href} onClick={showPageLoader} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">
+                      <Card variant="interactive" elevation="sm" className="flex min-h-40 items-start gap-4 p-5 text-start">
+                        <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${item.tone}`}><Icon className="h-7 w-7" aria-hidden="true" /></span>
+                        <span className="min-w-0 pt-1">
+                          <span className="block text-lg font-black text-ink">{item.title}</span>
+                          <span className="mt-2 block text-sm leading-7 text-slate-600">{item.description}</span>
+                        </span>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                )
+              })}
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="text-center relative z-20" elevation="sm">
-                <div className="text-5xl mb-2">👦</div>
-                <p className="text-gray-600 text-sm mb-1">الطلاب</p>
-                {isLoading ? (
-                  <div className="animate-pulse bg-gray-300 h-8 w-12 mx-auto rounded"></div>
-                ) : (
-                  <p className="text-3xl font-bold text-accent-green">{analytics?.total_students || 0}</p>
-                )}
-              </Card>
-            </motion.div>
+              <button type="button" onClick={() => toast('الإعدادات المتقدمة قريباً')} className="rounded-2xl text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">
+                <Card variant="subtle" elevation="none" className="flex min-h-40 items-start gap-4 p-5">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-200 text-slate-600"><Settings className="h-7 w-7" aria-hidden="true" /></span>
+                  <span className="min-w-0 pt-1"><span className="block text-lg font-black text-ink">الإعدادات</span><span className="mt-2 block text-sm leading-7 text-slate-600">إعدادات النظام المتقدمة ستتوفر قريباً.</span></span>
+                </Card>
+              </button>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="text-center relative z-20" elevation="sm">
-                <div className="text-5xl mb-2">📚</div>
-                <p className="text-gray-600 text-sm mb-1">القصص</p>
-                {isLoading ? (
-                  <div className="animate-pulse bg-gray-300 h-8 w-12 mx-auto rounded"></div>
-                ) : (
-                  <p className="text-3xl font-bold text-secondary">{analytics?.total_stories || 0}</p>
-                )}
-              </Card>
-            </motion.div>
+              <button type="button" onClick={() => toast('التقارير المتقدمة قريباً')} className="rounded-2xl text-start focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">
+                <Card variant="subtle" elevation="none" className="flex min-h-40 items-start gap-4 p-5">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700"><FileText className="h-7 w-7" aria-hidden="true" /></span>
+                  <span className="min-w-0 pt-1"><span className="block text-lg font-black text-ink">التقارير</span><span className="mt-2 block text-sm leading-7 text-slate-600">تقارير إدارية قابلة للتخصيص ستتوفر قريباً.</span></span>
+                </Card>
+              </button>
+            </div>
+          </section>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="text-center relative z-20" elevation="sm">
-                <div className="text-5xl mb-2">📊</div>
-                <p className="text-gray-600 text-sm mb-1">النشاط اليومي</p>
-                {isLoading ? (
-                  <div className="animate-pulse bg-gray-300 h-8 w-12 mx-auto rounded"></div>
-                ) : (
-                  <p className="text-3xl font-bold text-primary">{analytics?.daily_activity || 0}</p>
-                )}
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Navigation Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card
-                className="cursor-pointer hover:shadow-hover transition-all p-6 text-center relative z-20"
-                onClick={() => {
-                  showPageLoader()
-                  router.push('/admin/teachers')
-                }}
-              >
-                <div className="flex justify-center mb-3">
-                  <Users className="w-16 h-16 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">إدارة المعلمين</h3>
-                <p className="text-gray-300 text-sm font-semibold">
-                  إنشاء وإدارة حسابات المعلمين
-                </p>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card
-                className="cursor-pointer hover:shadow-hover transition-all p-6 text-center relative z-20"
-                onClick={() => {
-                  showPageLoader()
-                  router.push('/admin/permissions')
-                }}
-              >
-                <div className="flex justify-center mb-3">
-                  <Shield className="w-16 h-16 text-secondary" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">الأذونات</h3>
-                <p className="text-gray-300 text-sm font-semibold">
-                  إدارة أذونات وصول المعلمين
-                </p>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card
-                className="cursor-pointer hover:shadow-hover transition-all p-6 text-center relative z-20"
-                onClick={() => {
-                  showPageLoader()
-                  router.push('/admin/analytics')
-                }}
-              >
-                <div className="flex justify-center mb-3">
-                  <BarChart3 className="w-16 h-16 text-purple-400" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">التحليلات</h3>
-                <p className="text-gray-300 text-sm font-semibold">
-                  عرض إحصائيات النظام الشاملة
-                </p>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card
-                className="cursor-pointer hover:shadow-hover transition-all p-6 text-center relative z-20"
-                onClick={() => {
-                  showPageLoader()
-                  router.push('/admin/grades')
-                }}
-              >
-                <div className="flex justify-center mb-3">
-                  <GraduationCap className="w-16 h-16 text-accent-green" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">إدارة الصفوف</h3>
-                <p className="text-gray-300 text-sm font-semibold">
-                  إدارة الصفوف الدراسية والمعلمين
-                </p>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              <Card
-                className="cursor-pointer hover:shadow-hover transition-all p-6 text-center"
-                onClick={() => toast('قريباً جداً...')}
-              >
-                <div className="text-5xl mb-3">⚙️</div>
-                <h3 className="text-xl font-bold text-ink mb-2">الإعدادات</h3>
-                <p className="text-gray-600 text-sm">
-                  تكوين إعدادات النظام الشاملة
-                </p>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card
-                className="cursor-pointer hover:shadow-hover transition-all p-6 text-center"
-                onClick={() => toast('قريباً جداً...')}
-              >
-                <div className="text-5xl mb-3">📋</div>
-                <h3 className="text-xl font-bold text-ink mb-2">التقارير</h3>
-                <p className="text-gray-600 text-sm">
-                  إنشاء تقارير شاملة وتحليلات
-                </p>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Info Banner */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-          >
-            <Card
-              className="bg-gradient-to-r from-primary/20 to-secondary/20 text-center py-8"
-              elevation="md"
-            >
-              <div className="text-5xl mb-4">🛡️</div>
-              <h3 className="text-2xl font-bold text-ink mb-2">
-                أدوات الإدارة قيد التطوير
-              </h3>
-              <p className="text-gray-600 mb-4">
-                نحن نعمل على تطوير أدوات إدارة متقدمة ومتكاملة للنظام
-              </p>
-              <Button size="lg" variant="primary" disabled>
-                قريباً جداً
-              </Button>
-            </Card>
-          </motion.div>
+          <Card variant="admin" elevation="sm" className="mt-6 flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700"><Shield className="h-6 w-6" aria-hidden="true" /></span>
+            <div><h2 className="text-lg font-black text-ink">نظرة سريعة وآمنة</h2><p className="mt-1 text-sm leading-7 text-slate-600">استخدم التحليلات لمراجعة النشاط، ثم انتقل إلى الأذونات عند الحاجة إلى تعديل وصول المعلمين.</p></div>
+          </Card>
         </motion.div>
-      </div>
+      </main>
     </AnimatedBackground>
   )
 }

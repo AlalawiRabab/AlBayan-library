@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 export const dynamic = 'force-dynamic'
 import { motion } from 'framer-motion'
@@ -11,12 +11,19 @@ import Card from '@/components/Card'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
-import { BookOpen, Save, ArrowLeft, FileText } from 'lucide-react'
+import { BookOpen, Save, ArrowRight, FileText } from 'lucide-react'
 
 export default function CreateStory() {
   const router = useRouter()
-  const { user, userRole } = useAppStore()
+  const { user, userRole, hydrated } = useAppStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (userRole !== 'teacher') {
+      router.replace('/')
+    }
+  }, [hydrated, router, userRole])
   
   // Get teacher's assigned grade
   const teacherData = user as any
@@ -67,7 +74,7 @@ export default function CreateStory() {
         return
       }
 
-      toast.success('تم إنشاء القصة بنجاح! 🎉')
+      toast.success('تم إنشاء القصة بنجاح! ')
       
       setTimeout(() => {
         router.push('/teacher')
@@ -81,14 +88,13 @@ export default function CreateStory() {
   }
 
   if (userRole !== 'teacher') {
-    router.push('/')
     return null
   }
 
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen p-4 md:p-6" dir="rtl">
+      <div className="page-container min-h-screen" dir="rtl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -97,11 +103,11 @@ export default function CreateStory() {
           {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+              <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2 flex items-center gap-3">
                 <BookOpen className="w-10 h-10 text-accent-green" />
                 إنشاء قصة جديدة
               </h1>
-              <p className="text-gray-300 text-lg font-semibold">
+              <p className="text-slate-600 text-lg font-semibold">
                 اكتب قصة ملهمة للطلاب
               </p>
             </div>
@@ -109,7 +115,7 @@ export default function CreateStory() {
               onClick={() => router.back()}
               variant="ghost"
               size="md"
-              icon={<ArrowLeft className="w-5 h-5" />}
+              icon={<ArrowRight className="w-5 h-5" />}
             >
               العودة
             </Button>
@@ -119,8 +125,8 @@ export default function CreateStory() {
             <div className="space-y-6">
               {/* Title */}
               <Card>
-                <label className="block text-white font-bold text-xl mb-3">
-                  <FileText className="w-6 h-6 inline-block ml-2" />
+                <label className="block text-ink font-bold text-xl mb-3">
+                  <FileText className="w-6 h-6 inline-block ms-2" />
                   عنوان القصة
                 </label>
                 <input
@@ -130,7 +136,7 @@ export default function CreateStory() {
                     setStory({ ...story, title_arabic: e.target.value })
                   }
                   placeholder="مثال: القط الشجاع"
-                  className="w-full px-4 py-3 text-lg border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                  className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                   disabled={isSubmitting}
                   required
                 />
@@ -139,7 +145,7 @@ export default function CreateStory() {
               {/* Difficulty & Grade */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
-                  <label className="block text-white font-bold text-xl mb-3">
+                  <label className="block text-ink font-bold text-xl mb-3">
                     مستوى الصعوبة
                   </label>
                   <select
@@ -150,29 +156,29 @@ export default function CreateStory() {
                         difficulty: e.target.value as 'easy' | 'medium' | 'hard',
                       })
                     }
-                    className="w-full px-4 py-3 text-lg border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                    className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                     disabled={isSubmitting}
                   >
-                    <option value="easy">سهل 🟢</option>
-                    <option value="medium">متوسط 🟡</option>
-                    <option value="hard">صعب 🔴</option>
+                    <option value="easy">سهل </option>
+                    <option value="medium">متوسط </option>
+                    <option value="hard">صعب </option>
                   </select>
                 </Card>
 
                 <Card>
-                  <label className="block text-white font-bold text-xl mb-3">
+                  <label className="block text-ink font-bold text-xl mb-3">
                     الصف الدراسي
                   </label>
                   <select
                     value={story.grade_level}
-                    className="w-full px-4 py-3 text-lg border-2 border-slate-700 rounded-lg bg-slate-800 text-white font-semibold opacity-75 cursor-not-allowed"
+                    className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg bg-white text-ink font-semibold opacity-75 cursor-not-allowed"
                     disabled={true}
                   >
                     <option value={assignedGrade}>
                       الصف {assignedGrade === 3 ? 'الثالث' : assignedGrade === 4 ? 'الرابع' : assignedGrade === 6 ? 'السادس' : assignedGrade}
                     </option>
                   </select>
-                  <p className="text-gray-400 text-sm mt-2">
+                  <p className="text-slate-500 text-sm mt-2">
                     الصف المعين لك من قبل المشرف
                   </p>
                 </Card>
@@ -180,7 +186,7 @@ export default function CreateStory() {
 
               {/* Content */}
               <Card>
-                <label className="block text-white font-bold text-xl mb-3">
+                <label className="block text-ink font-bold text-xl mb-3">
                   محتوى القصة
                 </label>
                 <textarea
@@ -190,22 +196,22 @@ export default function CreateStory() {
                   }
                   placeholder="اكتب قصة رائعة هنا... (100 حرف على الأقل)"
                   rows={15}
-                  className="w-full px-4 py-3 text-lg border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white leading-relaxed font-semibold resize-none"
+                  className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink leading-relaxed font-semibold resize-none"
                   disabled={isSubmitting}
                   required
                 />
                 <div className="mt-2 flex justify-between text-sm">
-                  <span className="text-gray-400">
+                  <span className="text-slate-500">
                     عدد الأحرف: {story.content_arabic.length}
                   </span>
                   <span
                     className={
                       story.content_arabic.length >= 100
                         ? 'text-accent-green font-bold'
-                        : 'text-gray-400'
+                        : 'text-slate-500'
                     }
                   >
-                    {story.content_arabic.length >= 100 ? '✓ جاهز' : 'الحد الأدنى: 100'}
+                    {story.content_arabic.length >= 100 ? ' جاهز' : 'الحد الأدنى: 100'}
                   </span>
                 </div>
               </Card>
@@ -216,22 +222,22 @@ export default function CreateStory() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <Card className="bg-gradient-to-br from-primary/10 to-secondary/10">
-                    <h3 className="text-2xl font-bold text-white mb-4">
+                  <Card className="bg-white  ">
+                    <h3 className="text-2xl font-bold text-ink mb-4">
                       معاينة القصة
                     </h3>
-                    <div className="bg-slate-900 p-6 rounded-lg">
-                      <h4 className="text-2xl font-bold text-white mb-4">
+                    <div className="bg-white p-6 rounded-lg">
+                      <h4 className="text-2xl font-bold text-ink mb-4">
                         {story.title_arabic}
                       </h4>
                       <div className="flex gap-2 mb-4">
                         <span
                           className={`px-3 py-1 rounded-full text-sm font-bold ${
                             story.difficulty === 'easy'
-                              ? 'bg-accent-green text-white'
+                              ? 'bg-accent-green text-ink'
                               : story.difficulty === 'medium'
                               ? 'bg-secondary text-ink'
-                              : 'bg-accent-red text-white'
+                              : 'bg-accent-red text-ink'
                           }`}
                         >
                           {story.difficulty === 'easy'
@@ -240,11 +246,11 @@ export default function CreateStory() {
                             ? 'متوسط'
                             : 'صعب'}
                         </span>
-                        <span className="px-3 py-1 rounded-full text-sm font-bold bg-primary text-white">
+                        <span className="px-3 py-1 rounded-full text-sm font-bold bg-primary text-ink">
                           الصف {story.grade_level}
                         </span>
                       </div>
-                      <p className="text-gray-300 text-lg leading-relaxed whitespace-pre-wrap font-semibold">
+                      <p className="text-slate-600 text-lg leading-relaxed whitespace-pre-wrap font-semibold">
                         {story.content_arabic}
                       </p>
                     </div>

@@ -6,13 +6,14 @@ import { useRouter, useParams } from 'next/navigation'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import LoadingState from '@/components/LoadingState'
 import { useAppStore } from '@/lib/store'
 import { gradingService, supabase } from '@/lib/supabase'
-import { inferAudioMimeFromUrl } from '@/lib/utils'
+import { getTrustedStudentRecordingUrl, inferAudioMimeFromUrl } from '@/lib/utils'
 import toast, { Toaster } from 'react-hot-toast'
 import { 
   Star, 
-  ArrowLeft, 
+  ArrowRight,
   CheckCircle,
   Clock,
   User,
@@ -21,6 +22,7 @@ import {
   Save,
   Filter,
   Sparkles
+  ,Loader2
 } from 'lucide-react'
 
 interface Submission {
@@ -33,6 +35,7 @@ interface Submission {
   questions: any[]
   grade?: number
   auto_graded?: number
+  auto_feedback?: string
   feedback?: string
   submitted_at: string
   graded_at?: string
@@ -48,7 +51,7 @@ interface Student {
 export default function StudentDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const { user, userRole, isAuthenticated } = useAppStore()
+  const { user, userRole, isAuthenticated, hydrated } = useAppStore()
   const [studentId, setStudentId] = useState<string>('')
   const [student, setStudent] = useState<Student | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -62,6 +65,7 @@ export default function StudentDetailPage() {
   const [filter, setFilter] = useState<'all' | 'graded' | 'ungraded'>('all')
 
   useEffect(() => {
+    if (!hydrated) return
     // Extract studentId from params immediately
     const id = params?.id as string
     if (id) {
@@ -108,7 +112,7 @@ export default function StudentDetailPage() {
       }
     }
     // If we have studentId but auth state is still null/undefined, we wait (hydration in progress)
-  }, [isAuthenticated, userRole, router, studentId, user, params])
+  }, [hydrated, isAuthenticated, userRole, router, studentId, user, params])
 
   const loadStudentAndSubmissions = async () => {
     try {
@@ -160,10 +164,11 @@ export default function StudentDetailPage() {
           questions: sub.questions || [],
           grade: sub.grade,
           auto_graded: sub.auto_graded,
+          auto_feedback: sub.auto_feedback,
           feedback: sub.feedback,
           submitted_at: sub.submitted_at,
           graded_at: sub.graded_at,
-          audio_url: sub.audio_url,
+          audio_url: getTrustedStudentRecordingUrl(sub.audio_url),
           voice_grade: sub.voice_grade,
         }))
 
@@ -184,65 +189,17 @@ export default function StudentDetailPage() {
       setIsGettingAIAdvice(true)
       toast.loading('جاري الحصول على نصيحة الذكاء الاصطناعي...', { id: 'ai-advice' })
 
-      console.log('Getting AI advice for submission:', selectedSubmission.id)
-      console.log('Story title:', selectedSubmission.story_title)
-      console.log('Questions:', selectedSubmission.questions?.length)
-      console.log('Answers:', Object.keys(selectedSubmission.answers || {}))
-
-      // Try to get story content - first try by title (exact match)
-      let storyData = null
-      let storyError = null
-      
-      // First attempt: exact title match
-      const { data: exactMatch, error: exactError } = await supabase
-        .from('stories')
-        .select('content_arabic, title_arabic, difficulty, grade_level')
-        .eq('title_arabic', selectedSubmission.story_title)
-        .maybeSingle()
-
-      if (exactMatch && !exactError) {
-        storyData = exactMatch
-        console.log('Found story by exact title match')
-      } else {
-        // Second attempt: try case-insensitive or partial match using ilike
-        console.log('Exact match failed, trying partial match...')
-        const { data: partialMatch, error: partialError } = await supabase
-          .from('stories')
-          .select('content_arabic, title_arabic, difficulty, grade_level')
-          .ilike('title_arabic', `%${selectedSubmission.story_title}%`)
-          .limit(1)
-          .single()
-
-        if (partialMatch && !partialError) {
-          storyData = partialMatch
-          console.log('Found story by partial match')
-        } else {
-          storyError = partialError || exactError
-          console.warn('Could not find story by title:', storyError)
-        }
+      if (!user || !('access_code' in user)) {
+        throw new Error('تعذر التحقق من حساب المعلمة')
       }
-
-      // Prepare the request
-      const requestBody = {
-        questions: selectedSubmission.questions || [],
-        answers: selectedSubmission.answers || {},
-        storyContent: storyData?.content_arabic || '',
-        storyTitle: storyData?.title_arabic || selectedSubmission.story_title,
-        difficulty: storyData?.difficulty || 'medium',
-        gradeLevel: storyData?.grade_level || 1
-      }
-
-      console.log('Sending AI grading request:', {
-        hasStoryContent: !!requestBody.storyContent,
-        storyTitle: requestBody.storyTitle,
-        questionsCount: requestBody.questions.length,
-        answersCount: Object.keys(requestBody.answers).length
-      })
 
       const gradingResponse = await fetch('/api/auto-grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+          teacherAccessCode: (user as any).access_code,
+          submissionId: selectedSubmission.id
+        })
       })
 
       if (!gradingResponse.ok) {
@@ -297,7 +254,7 @@ export default function StudentDetailPage() {
       const result = await gradingService.gradeSubmission(selectedSubmission.id, gradeNum, feedback, voiceGradeNum)
       console.log('Grading completed successfully:', result)
 
-      toast.success('تم تقييم الإجابة بنجاح! 🎉')
+      toast.success('تم تقييم الإجابة بنجاح! ')
       
       // Update local state
       setSubmissions(submissions.map(sub => 
@@ -338,7 +295,7 @@ export default function StudentDetailPage() {
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen p-4 md:p-6" dir="rtl">
+      <div className="page-container min-h-screen" dir="rtl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -347,11 +304,11 @@ export default function StudentDetailPage() {
           {/* Header */}
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
             <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
-                <User className="w-6 h-6 md:w-10 md:h-10 text-blue-400" />
+              <h1 className="text-2xl md:text-4xl font-bold text-ink mb-2 flex items-center gap-3">
+                <User className="w-6 h-6 md:w-10 md:h-10 text-primary-700" />
                 {student ? `${student.name} - تقييم الإجابات` : 'تقييم الإجابات'}
               </h1>
-              <p className="text-gray-300 text-sm md:text-lg font-semibold">
+              <p className="text-slate-600 text-sm md:text-lg font-semibold">
                 تقييم وتصحيح إجابات الطالب
               </p>
             </div>
@@ -359,7 +316,7 @@ export default function StudentDetailPage() {
               onClick={() => router.push('/teacher/students')}
               variant="ghost"
               size="sm"
-              icon={<ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />}
+              icon={<ArrowRight className="w-4 h-4 md:w-5 md:h-5" />}
               className="w-full md:w-auto"
             >
               العودة
@@ -371,7 +328,7 @@ export default function StudentDetailPage() {
             <div className="lg:col-span-2">
               <Card>
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-4 mb-6">
-                  <h2 className="text-xl md:text-2xl font-bold text-white">قائمة الإجابات</h2>
+                  <h2 className="text-xl md:text-2xl font-bold text-ink">قائمة الإجابات</h2>
                   <div className="flex gap-2 w-full md:w-auto">
                     {[
                       { value: 'all', label: 'الكل' },
@@ -392,15 +349,12 @@ export default function StudentDetailPage() {
                 </div>
 
                 {isLoading ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4 animate-spin">⏳</div>
-                    <p className="text-xl text-gray-400">جاري التحميل...</p>
-                  </div>
+                  <LoadingState />
                 ) : filteredSubmissions.length === 0 ? (
                   <div className="text-center py-12">
                     <FileText className="w-20 h-20 text-gray-600 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-white mb-2">لا توجد إجابات</h3>
-                    <p className="text-gray-400">لم يرسل الطالب أي إجابات بعد</p>
+                    <h3 className="text-2xl font-bold text-ink mb-2">لا توجد إجابات</h3>
+                    <p className="text-slate-500">لم يرسل الطالب أي إجابات بعد</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -409,46 +363,46 @@ export default function StudentDetailPage() {
                         key={submission.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        className={`cursor-pointer rounded-lg border-2 p-4 transition-[border-color,background-color,box-shadow] ${
                           selectedSubmission?.id === submission.id
                             ? 'border-primary bg-primary/10'
-                            : 'border-slate-700 bg-slate-800/50 hover:bg-slate-800'
+                            : 'border-slate-200 bg-white hover:bg-white'
                         }`}
                         onClick={() => {
                           setSelectedSubmission(submission)
                           setGrade((submission.grade ?? submission.auto_graded ?? '').toString())
-                          setFeedback(submission.feedback || '')
+                          setFeedback(submission.feedback || submission.auto_feedback || '')
                           setVoiceGrade(submission.voice_grade?.toString() || '')
                         }}
                       >
                         <div className="flex justify-between items-start">
                           <div className="flex-1 min-w-0">
-                            <p className="text-gray-300 mb-2 text-sm md:text-base">
-                              <BookOpen className="w-3 h-3 md:w-4 md:h-4 inline-block ml-1" />
+                            <p className="text-slate-600 mb-2 text-sm md:text-base">
+                              <BookOpen className="w-3 h-3 md:w-4 md:h-4 inline-block ms-1" />
                               <span className="truncate block">{submission.story_title}</span>
                             </p>
-                            <p className="text-gray-400 text-xs md:text-sm">
-                              <FileText className="w-3 h-3 md:w-4 md:h-4 inline-block ml-1" />
+                            <p className="text-slate-500 text-xs md:text-sm">
+                              <FileText className="w-3 h-3 md:w-4 md:h-4 inline-block ms-1" />
                               <span className="truncate block">{submission.form_title}</span>
                             </p>
                             {/* Voice Status */}
                             {submission.audio_url && (
                               <div className="mt-2 flex items-center gap-2">
-                                <span className="text-xs px-2 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                                  🎤 تسجيل صوتي
+                                <span className="text-xs px-2 py-1 rounded-lg bg-secondary-50 text-secondary-700 border border-secondary-200/30">
+                                   تسجيل صوتي
                                 </span>
                                 {submission.voice_grade === null && submission.grade !== null && (
-                                  <span className="text-xs px-2 py-1 rounded-lg bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 animate-pulse">
-                                    ⏳ في انتظار تقييم الصوت
+                                  <span className="text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200/30 animate-pulse">
+                                    <Loader2 className="me-1 inline h-3.5 w-3.5 animate-spin" aria-hidden="true" /> في انتظار تقييم الصوت
                                   </span>
                                 )}
                               </div>
                             )}
                           </div>
-                          <div className="text-left">
+                          <div className="text-end">
                             <div className="flex items-center gap-2 mb-2">
-                              <Clock className="w-4 h-4 text-gray-400" />
-                              <span className="text-sm text-gray-400">
+                              <Clock className="w-4 h-4 text-slate-500" />
+                              <span className="text-sm text-slate-500">
                                 {new Date(submission.submitted_at).toLocaleDateString('ar-SA')}
                               </span>
                             </div>
@@ -461,8 +415,8 @@ export default function StudentDetailPage() {
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <Clock className="w-5 h-5 text-yellow-400" />
-                                <span className="text-lg font-bold text-yellow-400">
+                                <Clock className="w-5 h-5 text-amber-700" />
+                                <span className="text-lg font-bold text-amber-700">
                                   في الانتظار
                                 </span>
                               </div>
@@ -480,49 +434,49 @@ export default function StudentDetailPage() {
             <div>
               {selectedSubmission ? (
                 <Card>
-                  <h3 className="text-lg md:text-xl font-bold text-white mb-4">تقييم الإجابة</h3>
+                  <h3 className="text-lg md:text-xl font-bold text-ink mb-4">تقييم الإجابة</h3>
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
+                      <label className="block text-slate-600 font-semibold mb-2">
                         القصة
                       </label>
-                      <p className="text-white">{selectedSubmission.story_title}</p>
+                      <p className="text-ink">{selectedSubmission.story_title}</p>
                     </div>
 
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
+                      <label className="block text-slate-600 font-semibold mb-2">
                         النموذج
                       </label>
-                      <p className="text-white">{selectedSubmission.form_title}</p>
+                      <p className="text-ink">{selectedSubmission.form_title}</p>
                     </div>
 
                     {/* Existing Grades Display */}
                     {(selectedSubmission.grade !== null || selectedSubmission.voice_grade !== null) && (
                       <div className="grid grid-cols-2 gap-4">
                         {(selectedSubmission.grade ?? selectedSubmission.auto_graded) !== null && (selectedSubmission.grade ?? selectedSubmission.auto_graded) !== undefined && (
-                          <div className="bg-gradient-to-br from-blue-600/20 to-blue-700/20 rounded-lg p-2 md:p-3 border border-blue-500/30">
-                            <label className="block text-blue-300 font-semibold mb-1 text-xs">
+                          <div className="bg-white   rounded-lg p-2 md:p-3 border border-primary-200/30">
+                            <label className="block text-primary-700 font-semibold mb-1 text-xs">
                               تقييم النموذج
                             </label>
-                            <p className="text-white font-bold text-base md:text-lg">{(selectedSubmission.grade ?? selectedSubmission.auto_graded)}/100</p>
+                            <p className="text-ink font-bold text-base md:text-lg">{(selectedSubmission.grade ?? selectedSubmission.auto_graded)}/100</p>
                           </div>
                         )}
                         {selectedSubmission.voice_grade !== null && selectedSubmission.voice_grade !== undefined && (
-                          <div className="bg-gradient-to-br from-purple-600/20 to-purple-700/20 rounded-lg p-2 md:p-3 border border-purple-500/30">
-                            <label className="block text-purple-300 font-semibold mb-1 text-xs">
+                          <div className="bg-white   rounded-lg p-2 md:p-3 border border-secondary-200/30">
+                            <label className="block text-secondary-700 font-semibold mb-1 text-xs">
                               تقييم القراءة الصوتية
                             </label>
-                            <p className="text-white font-bold text-base md:text-lg">{selectedSubmission.voice_grade}/100</p>
+                            <p className="text-ink font-bold text-base md:text-lg">{selectedSubmission.voice_grade}/100</p>
                           </div>
                         )}
                         {(selectedSubmission.grade ?? selectedSubmission.auto_graded) !== null && (selectedSubmission.grade ?? selectedSubmission.auto_graded) !== undefined && 
                          selectedSubmission.voice_grade !== null && selectedSubmission.voice_grade !== undefined && (
-                          <div className="col-span-2 bg-gradient-to-br from-green-600/20 to-green-700/20 rounded-lg p-2 md:p-3 border border-green-500/30 text-center">
-                            <label className="block text-green-300 font-semibold mb-1 text-xs">
+                          <div className="col-span-2 bg-white   rounded-lg p-2 md:p-3 border border-emerald-200/30 text-center">
+                            <label className="block text-emerald-700 font-semibold mb-1 text-xs">
                               المعدل النهائي
                             </label>
-                            <p className="text-white font-bold text-lg md:text-xl">
+                            <p className="text-ink font-bold text-lg md:text-xl">
                               {Math.round((((selectedSubmission.grade ?? selectedSubmission.auto_graded ?? 0) + (selectedSubmission.voice_grade ?? 0)) / 2))}/100
                             </p>
                           </div>
@@ -533,10 +487,10 @@ export default function StudentDetailPage() {
                     {/* Feedback Display */}
                     {selectedSubmission.feedback && (
                       <div>
-                        <label className="block text-gray-300 font-semibold mb-2">
+                        <label className="block text-slate-600 font-semibold mb-2">
                           التعليق
                         </label>
-                        <div className="bg-slate-800 p-3 rounded-lg text-white text-sm">
+                        <div className="bg-white p-3 rounded-lg text-ink text-sm">
                           {selectedSubmission.feedback}
                         </div>
                       </div>
@@ -544,10 +498,10 @@ export default function StudentDetailPage() {
 
                     {/* Answers */}
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
+                      <label className="block text-slate-600 font-semibold mb-2">
                         الإجابات
                       </label>
-                      <div className="bg-slate-900 p-4 rounded-lg max-h-60 overflow-y-auto">
+                      <div className="bg-white p-4 rounded-lg max-h-60 overflow-y-auto">
                         {(() => {
                           // If we have questions array, use it
                           if (selectedSubmission.questions && Array.isArray(selectedSubmission.questions) && selectedSubmission.questions.length > 0) {
@@ -555,11 +509,11 @@ export default function StudentDetailPage() {
                               const answer = selectedSubmission.answers[question.id]
                               
                               return (
-                                <div key={question.id || index} className="mb-4 pb-4 border-b border-slate-700 last:border-b-0">
+                                <div key={question.id || index} className="mb-4 pb-4 border-b border-slate-200 last:border-b-0">
                                   <p className="text-sm font-bold text-primary mb-2">
                                     السؤال {index + 1}: {question.text_arabic}
                                   </p>
-                                  <p className="text-white text-sm bg-slate-800 p-3 rounded-lg whitespace-pre-wrap">
+                                  <p className="text-ink text-sm bg-white p-3 rounded-lg whitespace-pre-wrap">
                                     {answer || 'لم يجب الطالب'}
                                   </p>
                                 </div>
@@ -574,11 +528,11 @@ export default function StudentDetailPage() {
                             const questionText = question?.text_arabic || `السؤال ${index + 1}`
                             
                             return (
-                              <div key={answerKey} className="mb-4 pb-4 border-b border-slate-700 last:border-b-0">
+                              <div key={answerKey} className="mb-4 pb-4 border-b border-slate-200 last:border-b-0">
                                 <p className="text-sm font-bold text-primary mb-2">
                                   {questionText}
                                 </p>
-                                <p className="text-white text-sm bg-slate-800 p-3 rounded-lg whitespace-pre-wrap">
+                                <p className="text-ink text-sm bg-white p-3 rounded-lg whitespace-pre-wrap">
                                   {value as string}
                                 </p>
                               </div>
@@ -591,10 +545,10 @@ export default function StudentDetailPage() {
                     {/* Voice Recording */}
                     {selectedSubmission.audio_url && (
                       <div>
-                        <label className="block text-gray-300 font-semibold mb-2">
-                          التسجيل الصوتي للقراءة 🎤
+                        <label className="block text-slate-600 font-semibold mb-2">
+                          التسجيل الصوتي للقراءة
                         </label>
-                        <div className="bg-slate-900 p-4 rounded-lg">
+                        <div className="bg-white p-4 rounded-lg">
                           <audio
                             key={selectedSubmission.audio_url || selectedSubmission.id}
                             controls
@@ -610,7 +564,7 @@ export default function StudentDetailPage() {
                         
                         {/* Voice Grade Input */}
                         <div className="mt-4">
-                          <label className="block text-gray-300 font-semibold mb-2">
+                          <label className="block text-slate-600 font-semibold mb-2">
                             تقييم القراءة الصوتية (0-100)
                           </label>
                           <input
@@ -619,7 +573,7 @@ export default function StudentDetailPage() {
                             onChange={(e) => setVoiceGrade(e.target.value)}
                             min="0"
                             max="100"
-                            className="w-full px-3 md:px-4 py-2 md:py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold text-sm md:text-base"
+                            className="w-full px-3 md:px-4 py-2 md:py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold text-sm md:text-base"
                             disabled={isGrading}
                             placeholder="الدرجة (0-100)"
                           />
@@ -629,7 +583,7 @@ export default function StudentDetailPage() {
 
                     {/* Grade Input */}
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
+                      <label className="block text-slate-600 font-semibold mb-2">
                         الدرجة (0-100)
                       </label>
                       <input
@@ -638,14 +592,14 @@ export default function StudentDetailPage() {
                         onChange={(e) => setGrade(e.target.value)}
                         min="0"
                         max="100"
-                        className="w-full px-3 md:px-4 py-2 md:py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold text-sm md:text-base"
+                        className="w-full px-3 md:px-4 py-2 md:py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold text-sm md:text-base"
                         disabled={isGrading}
                       />
                     </div>
 
                     {/* Feedback */}
                     <div>
-                      <label className="block text-gray-300 font-semibold mb-2 text-sm md:text-base">
+                      <label className="block text-slate-600 font-semibold mb-2 text-sm md:text-base">
                         التعليق (اختياري)
                       </label>
                       <textarea
@@ -653,7 +607,7 @@ export default function StudentDetailPage() {
                         onChange={(e) => setFeedback(e.target.value)}
                         rows={3}
                         placeholder="اكتب تعليقك هنا..."
-                        className="w-full px-3 md:px-4 py-2 md:py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none text-sm md:text-base"
+                        className="w-full px-3 md:px-4 py-2 md:py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none text-sm md:text-base"
                         disabled={isGrading}
                       />
                     </div>
@@ -663,12 +617,12 @@ export default function StudentDetailPage() {
                       onClick={handleGetAIAdvice}
                       variant="ghost"
                       size="sm"
-                      className="w-full text-sm md:text-base border-2 border-purple-500/30 hover:bg-purple-500/20"
+                      className="w-full text-sm md:text-base border-2 border-secondary-200/30 hover:bg-secondary-50"
                       isLoading={isGettingAIAdvice}
                       disabled={isGettingAIAdvice || isGrading}
                       icon={<Sparkles className="w-4 h-4" />}
                     >
-                      {isGettingAIAdvice ? 'جاري المعالجة...' : '✨ الحصول على نصيحة الذكاء الاصطناعي'}
+                      {isGettingAIAdvice ? 'جاري المعالجة...' : 'الحصول على نصيحة الذكاء الاصطناعي'}
                     </Button>
 
                     {/* Actions */}
@@ -704,8 +658,8 @@ export default function StudentDetailPage() {
               ) : (
                 <Card className="text-center py-12">
                   <Star className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-white mb-2">اختر إجابة</h3>
-                  <p className="text-gray-400">اختر إجابة من القائمة لتقييمها</p>
+                  <h3 className="text-xl font-bold text-ink mb-2">اختر إجابة</h3>
+                  <p className="text-slate-500">اختر إجابة من القائمة لتقييمها</p>
                 </Card>
               )}
             </div>

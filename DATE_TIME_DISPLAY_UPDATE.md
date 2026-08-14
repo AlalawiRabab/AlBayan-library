@@ -129,7 +129,7 @@ className="text-white font-semibold text-xs md:text-sm"
 │ 📅 الصف: الصف 4                   │
 │ 📊 آخر دخول: ٣٠‏/١٠‏/٢٠٢٥، ٥:٠٠ م │  ← هنا!
 │                                     │
-│ رمز الوصول: TEACH4A2025ZXVN        │
+│ رمز الوصول: TEACHER_ACCESS_CODE     │
 └─────────────────────────────────────┘
 ```
 
