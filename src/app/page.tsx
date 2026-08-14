@@ -225,7 +225,7 @@ const loadLeaderboard = async () => {
                           )}
                           <div className="mt-2 text-lg font-extrabold text-primary-700 md:text-xl">{leaderboard[1].combined_score}</div>
                           {leaderboard[1].avg_grade && (
-                            <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                            <div className="mt-1 text-xs font-semibold text-primary-700 md:text-sm">
                               معدل: <bdi dir="ltr">{Math.round(leaderboard[1].avg_grade)}%</bdi>
                             </div>
                           )}
@@ -254,7 +254,7 @@ const loadLeaderboard = async () => {
                           )}
                           <div className="mt-2 text-xl font-extrabold text-amber-800 md:text-2xl">{leaderboard[0].combined_score}</div>
                           {leaderboard[0].avg_grade && (
-                            <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                            <div className="mt-1 text-xs font-semibold text-amber-800 md:text-sm">
                               معدل: <bdi dir="ltr">{Math.round(leaderboard[0].avg_grade)}%</bdi>
                             </div>
                           )}
@@ -283,7 +283,7 @@ const loadLeaderboard = async () => {
                           )}
                           <div className="mt-2 text-lg font-extrabold text-orange-800 md:text-xl">{leaderboard[2].combined_score}</div>
                           {leaderboard[2].avg_grade && (
-                            <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                            <div className="mt-1 text-xs font-semibold text-orange-800 md:text-sm">
                               معدل: <bdi dir="ltr">{Math.round(leaderboard[2].avg_grade)}%</bdi>
                             </div>
                           )}
@@ -302,20 +302,20 @@ const loadLeaderboard = async () => {
                           transition={{ duration: 0.6, delay: 0.4 }}
                           className="flex flex-col items-center"
                         >
-                          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary-200 bg-primary-100 text-primary-700 shadow-card md:mb-3 md:h-16 md:w-16">
+                          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-emerald-300 bg-emerald-100 text-emerald-800 shadow-card md:mb-3 md:h-16 md:w-16">
                             <Medal className="w-5 h-5 md:w-7 md:h-7" />
                           </div>
-                          <div className="min-w-full rounded-xl border-2 border-primary-200 bg-primary-50 p-2 text-center shadow-card md:p-3">
+                          <div className="min-w-full rounded-xl border-2 border-emerald-300 bg-emerald-50 p-2 text-center shadow-card md:p-3">
                             <h3 className="text-sm md:text-base font-bold text-ink break-words leading-tight px-1 mb-1">{leaderboard[3].name}</h3>
-                            <div className="mb-1 text-xs font-semibold text-primary-700 md:text-sm">المركز الرابع</div>
+                            <div className="mb-1 text-xs font-semibold text-emerald-800 md:text-sm">المركز الرابع</div>
                             {leaderboard[3].current_title && (
-                              <div className="my-1 truncate rounded-full border border-primary-200 bg-primary-100 px-2 py-1 text-xs font-semibold text-primary-700">
+                              <div className="my-1 truncate rounded-full border border-emerald-300 bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
                                  {leaderboard[3].current_title}
                               </div>
                             )}
-                            <div className="mt-1 text-lg font-extrabold text-primary-700 md:text-xl">{leaderboard[3].combined_score}</div>
+                            <div className="mt-1 text-lg font-extrabold text-emerald-800 md:text-xl">{leaderboard[3].combined_score}</div>
                             {leaderboard[3].avg_grade && (
-                              <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                              <div className="mt-1 text-xs font-semibold text-emerald-800 md:text-sm">
                                 معدل: <bdi dir="ltr">{Math.round(leaderboard[3].avg_grade)}%</bdi>
                               </div>
                             )}
@@ -343,7 +343,7 @@ const loadLeaderboard = async () => {
                             )}
                             <div className="mt-1 text-lg font-extrabold text-secondary-700 md:text-xl">{leaderboard[4].combined_score}</div>
                             {leaderboard[4].avg_grade && (
-                              <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                              <div className="mt-1 text-xs font-semibold text-secondary-700 md:text-sm">
                                 معدل: <bdi dir="ltr">{Math.round(leaderboard[4].avg_grade)}%</bdi>
                               </div>
                             )}
