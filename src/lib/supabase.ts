@@ -228,48 +228,44 @@ export const storiesService = {
 export const storageService = {
   async uploadAudioRecording(audioBlob: Blob, studentAccessCode: string, storyId: string): Promise<string> {
     try {
-      // Create a unique filename
-      const timestamp = Date.now()
+      if (audioBlob.size > 10 * 1024 * 1024) {
+        throw new Error('Audio recording exceeds the 10 MB upload limit')
+      }
+
       const originalMimeType = normalizeMimeType(audioBlob.type)
-      let uploadMimeType = originalMimeType
-      if (originalMimeType === 'audio/mp4' || originalMimeType === 'audio/m4a') {
-        uploadMimeType = 'video/mp4'
-      }
+      const allowedMimeTypes = new Set([
+        'audio/webm', 'audio/mpeg', 'audio/mp4', 'audio/m4a',
+        'audio/aac', 'audio/ogg', 'video/mp4'
+      ])
+      const uploadMimeType = originalMimeType === 'audio/mp4' || originalMimeType === 'audio/m4a'
+        ? 'video/mp4'
+        : allowedMimeTypes.has(originalMimeType)
+          ? originalMimeType
+          : 'application/octet-stream'
       const extension = getAudioExtensionFromMime(uploadMimeType)
-      const filename = `${studentAccessCode}_${storyId}_${timestamp}.${extension}`
-      const filePath = `voice-recordings/${filename}`
 
-      // Upload the blob to Supabase storage
-      const file = new File([audioBlob], filename, { type: uploadMimeType })
-
-      let uploadResult = await supabase.storage
-        .from('student-recordings')
-        .upload(filePath, file, {
-          contentType: uploadMimeType,
-          upsert: true
-        })
-      if (uploadResult.error) {
-        console.warn('Upload failed with mime', uploadMimeType, '- retrying with application/octet-stream fallback')
-        const fallbackFile = new File([audioBlob], filename, { type: 'application/octet-stream' })
-        uploadResult = await supabase.storage
-          .from('student-recordings')
-          .upload(filePath, fallbackFile, {
-            contentType: 'application/octet-stream',
-            upsert: true
-          })
+      const ticketResponse = await fetch('/api/student/audio-upload-ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentAccessCode, storyId, extension, contentType: uploadMimeType })
+      })
+      const ticket = await ticketResponse.json() as { path?: string; token?: string; publicUrl?: string; error?: string }
+      if (!ticketResponse.ok || !ticket.path || !ticket.token || !ticket.publicUrl) {
+        throw new Error(ticket.error || 'Failed to authorize audio upload')
       }
+
+      const filename = ticket.path.split('/').pop() || `recording.${extension}`
+      const file = new File([audioBlob], filename, { type: uploadMimeType })
+      const uploadResult = await supabase.storage
+        .from('student-recordings')
+        .uploadToSignedUrl(ticket.path, ticket.token, file, { contentType: uploadMimeType })
 
       if (uploadResult.error) {
         console.error('Error uploading audio:', uploadResult.error)
         throw uploadResult.error
       }
 
-      // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from('student-recordings')
-        .getPublicUrl(filePath)
-
-      return urlData.publicUrl
+      return ticket.publicUrl
     } catch (error) {
       console.error('Failed to upload audio recording:', error)
       throw error
@@ -299,48 +295,18 @@ export const formsService = {
     return data?.[0] || null
   },
 
-  async submitForm(
-    studentAccessCode: string, 
-    storyId: string, 
-    formTemplateId: string, 
-    answers: Record<string, string>, 
-    audioUrl?: string,
-    autoGrade?: number,
-    autoFeedback?: string
-  ) {
-    const submissionData: any = {
-      student_access_code: studentAccessCode,
-      story_uuid: storyId,
-      form_template_uuid: formTemplateId,
-      form_responses: answers
-    }
-
-    // Add optional parameters if provided
-    if (audioUrl) {
-      submissionData.audio_url = audioUrl
-    }
-    if (autoGrade !== undefined) {
-      submissionData.auto_graded = autoGrade
-    }
-    if (autoFeedback) {
-      submissionData.auto_feedback = autoFeedback
-    }
-
-    const { data, error } = await supabase.rpc('student_submit_form', submissionData)
-
-    if (error) throw error
-    return data?.[0] || null
-  },
 }
 
 export const gradingService = {
   async getTeacherSubmissions(teacherAccessCode: string) {
-    const { data, error } = await supabase.rpc('teacher_get_submissions', {
-      teacher_access_code: teacherAccessCode
+    const response = await fetch('/api/teacher/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teacherAccessCode })
     })
-
-    if (error) throw error
-    return data || []
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.error || 'Failed to load teacher submissions')
+    return result || []
   },
 
   async gradeSubmission(submissionId: string, grade: number, feedback: string, voiceGrade?: number) {
@@ -399,21 +365,26 @@ export const studentSubmissionsService = {
 }
 
 export const adminGradingService = {
-  async getGradeSubmissions(gradeLevel: number) {
+  async getGradeSubmissions(gradeLevel: number, adminAccessCode: string) {
     console.log('Loading submissions for grade:', gradeLevel)
-    
-    // Use RPC function to bypass RLS policies
-    const { data, error } = await supabase.rpc('admin_get_grade_submissions', {
-      grade_num: gradeLevel
-    })
 
-    if (error) {
-      console.error('Error loading grade submissions:', error)
-      throw error
+    const response = await fetch('/api/admin/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminAccessCode,
+        resource: 'grade_submissions',
+        gradeLevel
+      })
+    })
+    const result = await response.json()
+    if (!response.ok) {
+      console.error('Error loading grade submissions:', result.error)
+      throw new Error(result.error || 'Failed to load grade submissions')
     }
 
-    console.log('Loaded submissions for grade:', data?.length || 0)
-    return data || []
+    console.log('Loaded submissions for grade:', result.submissions?.length || 0)
+    return result.submissions || []
   },
 }
 

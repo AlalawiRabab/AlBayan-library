@@ -13,7 +13,7 @@
 - **16 successful migrations**
 - **Automated triggers** for stats and achievements
 - **Sample data** (6 stories, 6 forms, 3 teachers, 6 achievement titles)
-- **Access codes ready**: ADMIN2025, TEACH3A2025, TEACH4A2025, TEACH6A2025
+- **Access codes ready**: retrieve active codes from the secure administrator channel
 
 ### ✅ **Next.js Foundation (80% Complete)**
 - **Project initialized** with TypeScript + Tailwind CSS
@@ -89,10 +89,10 @@ Visit: `http://localhost:3000`
 ### 4. Test with Sample Data
 
 **Login Codes:**
-- Admin: `ADMIN2025`
-- Teacher Grade 3: `TEACH3A2025`
-- Teacher Grade 4: `TEACH4A2025`
-- Teacher Grade 6: `TEACH6A2025`
+- Admin: use the active admin code stored securely outside the repository
+- Teacher Grade 3: use the assigned teacher code
+- Teacher Grade 4: use the assigned teacher code
+- Teacher Grade 6: use the assigned teacher code
 - Students: Teachers can generate codes
 
 ---
@@ -328,8 +328,8 @@ npm run dev
 open http://localhost:3000/login
 
 # Test each user type
-- Admin: ADMIN2025
-- Teacher: TEACH3A2025
+- Admin: use the active admin code
+- Teacher: use the assigned teacher code
 - Student: Create code from teacher interface
 ```
 

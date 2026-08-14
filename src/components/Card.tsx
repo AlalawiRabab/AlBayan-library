@@ -5,10 +5,11 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   padding?: 'none' | 'sm' | 'md' | 'lg'
   elevation?: 'none' | 'sm' | 'md' | 'lg'
+  variant?: 'default' | 'interactive' | 'subtle' | 'highlight' | 'student' | 'teacher' | 'admin'
 }
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, children, padding = 'md', elevation = 'md', ...props }, ref) => {
+  ({ className, children, padding = 'md', elevation = 'md', variant = 'default', ...props }, ref) => {
     const paddingClasses = {
       none: 'p-0',
       sm: 'p-3',
@@ -23,11 +24,22 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
       lg: 'shadow-lg',
     }
 
+    const variantClasses = {
+      default: 'bg-white border-slate-200',
+      interactive: 'bg-white border-slate-200 hover:-translate-y-1 hover:border-primary/35 hover:shadow-hover',
+      subtle: 'bg-slate-50 border-slate-200',
+      highlight: 'bg-primary-50 border-primary/20',
+      student: 'bg-white border-primary-100 shadow-card',
+      teacher: 'bg-white border-secondary-100 shadow-card',
+      admin: 'bg-white border-slate-200 shadow-card',
+    }
+
     return (
       <div
         ref={ref}
         className={cn(
-          'bg-slate-800 text-white rounded-xl transition-all duration-200 hover:shadow-hover border border-slate-700',
+          'rounded-2xl border text-ink transition-[transform,border-color,box-shadow] duration-200',
+          variantClasses[variant],
           paddingClasses[padding],
           elevationClasses[elevation],
           className

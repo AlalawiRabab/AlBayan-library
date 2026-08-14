@@ -6,11 +6,13 @@ import { useRouter, useParams } from 'next/navigation'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import LoadingState from '@/components/LoadingState'
 import StoryQuestions from '@/components/student/StoryQuestions'
 import { useAppStore } from '@/lib/store'
 import { storiesService, storageService } from '@/lib/supabase'
 import { normalizeMimeType } from '@/lib/utils'
 import toast, { Toaster } from 'react-hot-toast'
+import { AlertCircle, Clock3, Mic, Pause, Play, Square, Trash2 } from 'lucide-react'
 
 export default function StoryReader() {
   const router = useRouter()
@@ -116,7 +118,7 @@ export default function StoryReader() {
   // Start recording
   const startRecording = async () => {
     try {
-      console.log('🔍 Starting recording...')
+      console.log(' Starting recording...')
       console.log('User agent:', navigator.userAgent)
       console.log('Has getUserMedia:', !!navigator.mediaDevices?.getUserMedia)
       console.log('Has MediaRecorder:', typeof MediaRecorder !== 'undefined')
@@ -124,7 +126,7 @@ export default function StoryReader() {
       // Check if MediaRecorder API is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         const errorMsg = 'متصفحك لا يدعم التسجيل الصوتي. استخدم Chrome أو Firefox'
-        console.error('❌ getUserMedia not supported')
+        console.error('getUserMedia not supported')
         toast.error(errorMsg)
         return
       }
@@ -132,12 +134,12 @@ export default function StoryReader() {
       // Check if MediaRecorder exists
       if (typeof MediaRecorder === 'undefined') {
         const errorMsg = 'متصفحك لا يدعم MediaRecorder. استخدم Chrome أو Firefox'
-        console.error('❌ MediaRecorder not supported')
+        console.error('MediaRecorder not supported')
         toast.error(errorMsg)
         return
       }
 
-      console.log('✅ APIs supported, requesting permission...')
+      console.log('Recording APIs supported, requesting permission...')
 
       // Request microphone permission - simplified for better mobile support
       let stream
@@ -145,9 +147,9 @@ export default function StoryReader() {
         stream = await navigator.mediaDevices.getUserMedia({ 
           audio: true // Simplified to just request audio, let browser handle the rest
         })
-        console.log('✅ Permission granted, stream obtained')
+        console.log('Microphone permission granted')
       } catch (permError: any) {
-        console.error('❌ Permission error:', permError)
+        console.error('Permission error:', permError)
         throw permError
       }
       
@@ -166,15 +168,15 @@ export default function StoryReader() {
           try {
             if (MediaRecorder.isTypeSupported(candidate)) {
               mimeType = candidate
-              console.log('✅ Using supported mimeType:', candidate)
+              console.log('Using supported mimeType:', candidate)
               break
             }
           } catch (err) {
-            console.warn('⚠️ Error checking mimeType support for', candidate, err)
+            console.warn('Error checking mimeType support for', candidate, err)
           }
         }
       } else {
-        console.log('⚠️ MediaRecorder.isTypeSupported is not available')
+        console.log('MediaRecorder.isTypeSupported is not available')
       }
       
       console.log('Creating MediaRecorder with mimeType:', mimeType)
@@ -182,7 +184,7 @@ export default function StoryReader() {
       try {
         mediaRecorder = new MediaRecorder(stream, { mimeType })
       } catch (creationError) {
-        console.warn('⚠️ Failed to create MediaRecorder with mimeType', mimeType, creationError)
+        console.warn('Failed to create MediaRecorder with mimeType', mimeType, creationError)
         mediaRecorder = new MediaRecorder(stream)
         mimeType = mediaRecorder.mimeType || mimeType
       }
@@ -193,12 +195,12 @@ export default function StoryReader() {
       mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           chunks.push(event.data)
-          console.log('📦 Data chunk received:', event.data.size, 'bytes')
+          console.log(' Data chunk received:', event.data.size, 'bytes')
         }
       }
       
       mediaRecorder.onstop = () => {
-        console.log('⏹️ Recording stopped, creating blob from', chunks.length, 'chunks')
+        console.log(' Recording stopped, creating blob from', chunks.length, 'chunks')
         const finalMimeType = normalizeMimeType(mediaRecorder.mimeType || mimeType)
         const blob = new Blob(chunks, { type: finalMimeType })
         const url = URL.createObjectURL(blob)
@@ -206,18 +208,18 @@ export default function StoryReader() {
         setAudioUrl(url)
         setAudioMimeType(finalMimeType === 'audio/mp4' ? 'audio/m4a' : finalMimeType)
         stream.getTracks().forEach(track => track.stop())
-        console.log('✅ Recording saved successfully')
-        toast.success('تم حفظ التسجيل! 🎉')
+        console.log('Recording saved successfully')
+        toast.success('تم حفظ التسجيل! ')
       }
 
       mediaRecorder.onerror = (event: any) => {
-        console.error('❌ MediaRecorder error:', event)
+        console.error('MediaRecorder error:', event)
         toast.error('حدث خطأ أثناء التسجيل')
         setIsRecording(false)
         stream.getTracks().forEach(track => track.stop())
       }
       
-      console.log('🎙️ Starting MediaRecorder...')
+      console.log(' Starting MediaRecorder...')
       mediaRecorder.start()
       setIsRecording(true)
       setRecordingDuration(0)
@@ -227,10 +229,10 @@ export default function StoryReader() {
         setRecordingDuration((prev) => prev + 1)
       }, 1000)
       
-      console.log('✅ Recording started successfully')
-      toast.success('بدأ التسجيل 🎤')
+      console.log('Recording started successfully')
+      toast.success('بدأ التسجيل ')
     } catch (error: any) {
-      console.error('❌ Error starting recording:', error)
+      console.error('Error starting recording:', error)
       console.error('Error name:', error.name)
       console.error('Error message:', error.message)
       
@@ -272,7 +274,7 @@ export default function StoryReader() {
     if (audioRef.current) {
       audioRef.current.play()
       setIsPlaying(true)
-      toast.success('تشغيل التسجيل 🔊')
+      toast.success('تشغيل التسجيل ')
     }
   }
 
@@ -326,7 +328,7 @@ export default function StoryReader() {
     try {
       // Check if audio recording exists
       if (!audioUrl || !audioBlob) {
-        toast.error('يرجى تسجيل صوتك أولاً قبل المتابعة! 📹', {
+        toast.error('يرجى تسجيل صوتك أولاً قبل المتابعة! ', {
           duration: 4000,
           style: {
             background: '#ef4444',
@@ -351,14 +353,14 @@ export default function StoryReader() {
         const storageKey = `audio_recording_${storyId}`
         localStorage.setItem(storageKey, uploadedAudioUrl)
         
-        toast.success('تم حفظ التسجيل الصوتي بنجاح! 🎉', { id: 'uploading' })
+        toast.success('تم حفظ التسجيل الصوتي بنجاح! ', { id: 'uploading' })
       } catch (error) {
         console.error('Error uploading audio:', error)
         toast.error('فشل تحميل التسجيل الصوتي', { id: 'uploading' })
         return
       }
       
-      toast.success('تم حفظ التسجيل الصوتي بنجاح! 🎉')
+      toast.success('تم حفظ التسجيل الصوتي بنجاح! ')
     } catch (error) {
       console.error('Error completing story:', error)
       toast.error('حدث خطأ في إكمال القصة')
@@ -374,12 +376,7 @@ export default function StoryReader() {
   if (isLoading) {
     return (
       <AnimatedBackground>
-        <div className="w-full h-screen flex items-center justify-center" dir="rtl">
-          <div className="text-center">
-            <div className="text-6xl mb-4 animate-bounce">📚</div>
-            <p className="text-2xl font-bold text-white">جاري تحميل القصة...</p>
-          </div>
-        </div>
+        <div className="min-h-screen" dir="rtl"><LoadingState label="جاري تحميل القصة..." /></div>
       </AnimatedBackground>
     )
   }
@@ -389,8 +386,8 @@ export default function StoryReader() {
       <AnimatedBackground>
         <div className="w-full h-screen flex items-center justify-center" dir="rtl">
           <div className="text-center">
-            <div className="text-6xl mb-4">❌</div>
-            <p className="text-2xl font-bold text-white">لم يتم العثور على القصة</p>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-700"><AlertCircle className="h-8 w-8" aria-hidden="true" /></div>
+            <p className="text-2xl font-bold text-ink">لم يتم العثور على القصة</p>
             <Button onClick={() => router.push('/student')} className="mt-4">
               العودة للصفحة الرئيسية
             </Button>
@@ -407,7 +404,7 @@ export default function StoryReader() {
       {isFullScreen ? (
         // Full Screen Reading Mode
         <motion.div
-          className="fixed inset-0 bg-gradient-to-br from-cloud via-white to-blue-50 z-50"
+          className="fixed inset-0 bg-white    z-50"
           onClick={() => setShowControls(!showControls)}
           onMouseMove={() => setShowControls(true)}
         >
@@ -420,19 +417,19 @@ export default function StoryReader() {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-8"
               >
-                <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 font-arabic">
+                <h1 className="text-4xl md:text-5xl font-bold text-ink mb-4 font-arabic">
                   {story.title_arabic}
                 </h1>
-                <p className="text-gray-200 text-lg mb-4">قصة جميلة ومفيدة</p>
+                <p className="text-slate-700 text-lg mb-4">قصة جميلة ومفيدة</p>
                 <div className="flex justify-center gap-4">
-                  <span className={`px-4 py-2 text-white rounded-full font-bold ${
+                  <span className={`px-4 py-2 text-ink rounded-full font-bold ${
                     story.difficulty === 'easy' ? 'bg-accent-green' :
                     story.difficulty === 'medium' ? 'bg-secondary' : 'bg-accent-red'
                   }`}>
                     {story.difficulty === 'easy' ? 'سهل' : 
                      story.difficulty === 'medium' ? 'متوسط' : 'صعب'}
                   </span>
-                  <span className="px-4 py-2 bg-primary text-white rounded-full font-bold">
+                  <span className="px-4 py-2 bg-primary text-ink rounded-full font-bold">
                     الصف {story.grade_level}
                   </span>
                 </div>
@@ -443,7 +440,7 @@ export default function StoryReader() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="text-xl text-right leading-relaxed text-gray-800 mb-8 bg-white/90 backdrop-blur-sm p-4 md:p-8 rounded-xl shadow-lg border border-gray-200 overflow-x-hidden overflow-y-visible"
+                className="mb-8 overflow-x-hidden overflow-y-visible rounded-xl border border-gray-200 bg-white p-4 text-start text-xl leading-relaxed text-gray-800 shadow-lg md:p-8"
               >
                 <div className="whitespace-pre-wrap font-arabic break-words" style={{ lineHeight: '2' }}>
                   {story.content_arabic}
@@ -462,18 +459,18 @@ export default function StoryReader() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: showControls ? 1 : 0, y: showControls ? 0 : -20 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/20 to-transparent flex justify-between items-center pointer-events-none"
+            className="fixed top-0 start-0 end-0 p-4 bg-white   flex justify-between items-center pointer-events-none"
           >
             <Button
               onClick={() => router.back()}
               variant="ghost"
               size="md"
-              className="text-white pointer-events-auto hover:bg-white/20"
+              className="text-ink pointer-events-auto hover:bg-white"
             >
               العودة
             </Button>
-            <span className="text-white font-bold text-lg">
-              ⏱️ {formatTime(readingTime)}
+            <span className="flex items-center gap-2 text-lg font-bold text-ink" dir="ltr">
+              <Clock3 className="h-5 w-5" aria-hidden="true" /> {formatTime(readingTime)}
             </span>
           </motion.div>
 
@@ -482,13 +479,13 @@ export default function StoryReader() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: showControls ? 1 : 0, y: showControls ? 0 : 20 }}
             transition={{ duration: 0.3 }}
-            className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/30 to-transparent flex flex-col items-center gap-4 pointer-events-none"
+            className="fixed bottom-0 start-0 end-0 p-6 bg-white   flex flex-col items-center gap-4 pointer-events-none"
           >
             {/* Recording Controls */}
             <div className="flex gap-3 pointer-events-auto items-center">
               {isRecording && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg font-bold">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-ink rounded-lg font-bold">
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-rose-600"></div>
                   <span>{formatTime(recordingDuration)}</span>
                 </div>
               )}
@@ -499,9 +496,10 @@ export default function StoryReader() {
                       onClick={startRecording}
                       variant="secondary"
                       size="md"
-                      className="bg-white/20 hover:bg-white/30"
+                      className="border border-secondary-200 bg-secondary-50 text-secondary-700 hover:bg-secondary-100"
+                      icon={<Mic className="h-4 w-4" />}
                     >
-                      <span className="mr-2">🎤</span>بدء التسجيل
+                      بدء التسجيل
                     </Button>
                   ) : (
                     <Button
@@ -509,8 +507,9 @@ export default function StoryReader() {
                       variant="danger"
                       size="lg"
                       className="shadow-lg"
+                      icon={<Square className="h-4 w-4" />}
                     >
-                      <span className="mr-2">⏹️</span>إيقاف التسجيل
+                      إيقاف التسجيل
                     </Button>
                   )}
                 </>
@@ -520,24 +519,18 @@ export default function StoryReader() {
                     onClick={isPlaying ? stopAudio : playAudio}
                     variant={isPlaying ? "secondary" : "primary"}
                     size="md"
+                    icon={isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   >
-                    {isPlaying ? (
-                      <>
-                        <span className="mr-2">⏸️</span>إيقاف
-                      </>
-                    ) : (
-                      <>
-                        <span className="mr-2">▶️</span>تشغيل
-                      </>
-                    )}
+                    {isPlaying ? 'إيقاف' : 'تشغيل'}
                   </Button>
                   <Button
                     onClick={deleteRecording}
                     variant="ghost"
                     size="md"
-                    className="bg-white/20 hover:bg-white/30"
+                    className="border border-slate-200 bg-white hover:bg-slate-50"
+                    icon={<Trash2 className="h-4 w-4" />}
                   >
-                    <span className="mr-2">🗑️</span>حذف
+                    حذف
                   </Button>
                 </>
               )}
@@ -558,9 +551,9 @@ export default function StoryReader() {
                 onClick={handleComplete}
                 variant={!audioUrl ? "ghost" : "primary"}
                 size="lg"
-                className={!audioUrl ? "bg-white/30 hover:bg-white/40 border-2 border-yellow-400" : "shadow-lg"}
+                className={!audioUrl ? "border-2 border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" : "shadow-lg"}
               >
-                {!audioUrl ? "📹 يجب التسجيل أولاً" : "انتهيت من القراءة ✓"}
+                {!audioUrl ? " يجب التسجيل أولاً" : "انتهيت من القراءة "}
               </Button>
             </div>
           </motion.div>
@@ -568,7 +561,7 @@ export default function StoryReader() {
       ) : (
         // Normal Reading Mode with side-by-side questions
         <AnimatedBackground>
-          <div className="w-full min-h-screen p-4 md:p-6 pb-28 md:pb-32" dir="rtl">
+          <div className="page-container min-h-screen pb-28 md:pb-32" dir="rtl">
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -576,9 +569,7 @@ export default function StoryReader() {
             >
               {/* Header */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <h1 className="text-xl md:text-4xl font-bold text-white">
-                  {story.title_arabic} 📖
-                </h1>
+                <h1 className="text-xl font-bold text-ink md:text-4xl">{story.title_arabic}</h1>
                 <Button
                   onClick={() => router.back()}
                   variant="ghost"
@@ -611,18 +602,18 @@ export default function StoryReader() {
                   <Card className="mb-6" elevation="sm">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div>
-                        <p className="text-gray-200 text-sm">وقت القراءة</p>
+                        <p className="text-slate-700 text-sm">وقت القراءة</p>
                         <p className="text-xl md:text-2xl font-bold text-primary">{formatTime(readingTime)}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className={`inline-block px-3 py-1 md:px-4 md:py-2 text-white text-sm rounded-full font-bold ${
+                        <span className={`inline-block px-3 py-1 md:px-4 md:py-2 text-ink text-sm rounded-full font-bold ${
                           story.difficulty === 'easy' ? 'bg-accent-green' :
                           story.difficulty === 'medium' ? 'bg-secondary' : 'bg-accent-red'
                         }`}>
                           {story.difficulty === 'easy' ? 'سهل' : 
                            story.difficulty === 'medium' ? 'متوسط' : 'صعب'}
                         </span>
-                        <span className="inline-block px-3 py-1 md:px-4 md:py-2 bg-primary text-white text-sm rounded-full font-bold">
+                        <span className="inline-block px-3 py-1 md:px-4 md:py-2 bg-primary text-ink text-sm rounded-full font-bold">
                           الصف {story.grade_level}
                         </span>
                       </div>
@@ -631,7 +622,7 @@ export default function StoryReader() {
 
                   {/* Story */}
                   <Card elevation="md" padding="lg" className="mb-6 overflow-hidden">
-                    <div className="text-base md:text-xl text-right leading-relaxed space-y-4 font-arabic" style={{ lineHeight: '2.2' }}>
+                    <div className="text-base md:text-xl text-start leading-relaxed space-y-4 font-arabic" style={{ lineHeight: '2.2' }}>
                       <div className="whitespace-pre-wrap p-3 md:p-6 rounded-lg break-words">
                         {story.content_arabic}
                       </div>
@@ -641,19 +632,19 @@ export default function StoryReader() {
                   {/* Voice Recording Card */}
                   <Card elevation="md" padding="lg" className="mb-6" id="student-recording-section">
                     <div className="mb-4">
-                      <h3 className="text-lg md:text-xl font-bold text-white mb-2">🎤 تسجيل القراءة</h3>
-                      <p className="text-gray-200 text-xs md:text-sm">سجل نفسك وأنت تقرأ، ثم استمع إلى تسجيلك</p>
+                      <h3 className="text-lg md:text-xl font-bold text-ink mb-2"> تسجيل القراءة</h3>
+                      <p className="text-slate-700 text-xs md:text-sm">سجل نفسك وأنت تقرأ، ثم استمع إلى تسجيلك</p>
                     </div>
 
                     {isRecording && (
                       <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="mb-4 p-4 bg-red-50 rounded-lg border-2 border-red-500"
+                        className="mb-4 p-4 bg-red-50 rounded-lg border-2 border-rose-200"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                            <div className="h-3 w-3 animate-pulse rounded-full bg-rose-600"></div>
                             <span className="text-red-700 font-bold">جاري التسجيل...</span>
                           </div>
                           <span className="text-red-700 font-bold">{formatTime(recordingDuration)}</span>
@@ -670,8 +661,9 @@ export default function StoryReader() {
                               variant="primary"
                               size="md"
                               className="flex-1 min-w-[120px] text-sm md:text-base"
+                              icon={<Mic className="h-4 w-4" />}
                             >
-                              <span className="mr-2">🎤</span>بدء التسجيل
+                              بدء التسجيل
                             </Button>
                           ) : (
                             <Button
@@ -679,8 +671,9 @@ export default function StoryReader() {
                               variant="danger"
                               size="md"
                               className="flex-1 min-w-[120px] text-sm md:text-base"
+                              icon={<Square className="h-4 w-4" />}
                             >
-                              <span className="mr-2">⏹️</span>إيقاف
+                              إيقاف
                             </Button>
                           )}
                         </>
@@ -691,24 +684,18 @@ export default function StoryReader() {
                             variant={isPlaying ? "secondary" : "primary"}
                             size="md"
                             className="flex-1 min-w-[120px] text-sm md:text-base"
+                            icon={isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                           >
-                            {isPlaying ? (
-                              <>
-                                <span className="mr-2">⏸️</span>إيقاف
-                              </>
-                            ) : (
-                              <>
-                                <span className="mr-2">▶️</span>تشغيل
-                              </>
-                            )}
+                            {isPlaying ? 'إيقاف' : 'تشغيل'}
                           </Button>
                           <Button
                             onClick={deleteRecording}
                             variant="ghost"
                             size="md"
                             className="border-2 border-gray-300 text-sm md:text-base"
+                            icon={<Trash2 className="h-4 w-4" />}
                           >
-                            <span className="mr-2">🗑️</span>حذف
+                            حذف
                           </Button>
                         </>
                       )}

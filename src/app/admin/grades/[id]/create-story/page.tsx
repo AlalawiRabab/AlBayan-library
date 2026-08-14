@@ -8,12 +8,12 @@ import { supabase } from '@/lib/supabase'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Save, Plus } from 'lucide-react'
+import { ArrowRight, Save, Plus } from 'lucide-react'
 
 export default function CreateStory() {
   const router = useRouter()
   const params = useParams()
-  const { user, userRole } = useAppStore()
+  const { user, userRole, hydrated } = useAppStore()
   const gradeId = params.id as string
   
   const [story, setStory] = useState({
@@ -24,11 +24,12 @@ export default function CreateStory() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
+    if (!hydrated) return
     if (userRole !== 'admin') {
       router.push('/')
       return
     }
-  }, [userRole, router])
+  }, [hydrated, userRole, router])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,7 +71,7 @@ export default function CreateStory() {
 
       if (error) throw error
 
-      toast.success('تم إنشاء القصة بنجاح! 🎉')
+      toast.success('تم إنشاء القصة بنجاح! ')
       router.push(`/admin/grades/${gradeId}`)
     } catch (error) {
       console.error('Error creating story:', error)
@@ -81,16 +82,16 @@ export default function CreateStory() {
   }
 
   return (
-    <div className="min-h-screen bg-cloud p-4 md:p-6">
+    <div className="page-container min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">إضافة قصة جديدة</h1>
+          <h1 className="text-3xl font-bold text-ink">إضافة قصة جديدة</h1>
           <Button
             onClick={() => router.push(`/admin/grades/${gradeId}`)}
             variant="ghost"
             size="md"
-            icon={<ArrowLeft className="w-4 h-4" />}
+            icon={<ArrowRight className="w-4 h-4" />}
           >
             العودة
           </Button>
@@ -99,48 +100,48 @@ export default function CreateStory() {
         {/* Form */}
         <Card className="p-6">
           <form onSubmit={handleSave} className="space-y-4">
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-              <p className="text-blue-300 text-sm">
+            <div className="bg-primary-50 border border-primary-200/30 rounded-lg p-4">
+              <p className="text-primary-700 text-sm">
                 هذه القصة ستكون للصف {gradeId}
               </p>
             </div>
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 عنوان القصة
               </label>
               <input
                 type="text"
                 value={story.title_arabic}
                 onChange={(e) => setStory({ ...story, title_arabic: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 required
                 disabled={isSaving}
               />
             </div>
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 محتوى القصة
               </label>
               <textarea
                 value={story.content_arabic}
                 onChange={(e) => setStory({ ...story, content_arabic: e.target.value })}
                 rows={15}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none font-arabic"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none font-arabic"
                 required
                 disabled={isSaving}
               />
             </div>
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 مستوى الصعوبة
               </label>
               <select
                 value={story.difficulty}
                 onChange={(e) => setStory({ ...story, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 disabled={isSaving}
               >
                 <option value="easy">سهل</option>

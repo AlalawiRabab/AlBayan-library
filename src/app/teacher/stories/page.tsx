@@ -36,7 +36,7 @@ interface Story {
 
 export default function TeacherStoriesPage() {
   const router = useRouter()
-  const { user, isAuthenticated, userRole } = useAppStore()
+  const { user, isAuthenticated, userRole, hydrated } = useAppStore()
   const [stories, setStories] = useState<Story[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editingStory, setEditingStory] = useState<Story | null>(null)
@@ -45,13 +45,14 @@ export default function TeacherStoriesPage() {
   const [isClosingEdit, setIsClosingEdit] = useState(false)
 
   useEffect(() => {
+    if (!hydrated) return
     if (!isAuthenticated || userRole !== 'teacher') {
       router.push('/')
       return
     }
 
     loadStories()
-  }, [isAuthenticated, userRole, router])
+  }, [hydrated, isAuthenticated, userRole, router])
 
   const loadStories = async () => {
     try {
@@ -113,13 +114,13 @@ export default function TeacherStoriesPage() {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'easy':
-        return 'from-green-500 to-green-600'
+        return ' '
       case 'medium':
-        return 'from-yellow-500 to-yellow-600'
+        return ' '
       case 'hard':
-        return 'from-red-500 to-red-600'
+        return ' '
       default:
-        return 'from-gray-500 to-gray-600'
+        return ' '
     }
   }
 
@@ -142,7 +143,7 @@ export default function TeacherStoriesPage() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="min-h-screen p-6"
+        className="page-container min-h-screen"
       >
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -152,11 +153,11 @@ export default function TeacherStoriesPage() {
             className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8"
           >
             <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+              <h1 className="text-2xl md:text-4xl font-bold text-ink mb-2 flex items-center gap-3">
                 <BookOpen className="w-6 h-6 md:w-10 md:h-10 text-primary" />
                 قصصي
               </h1>
-              <p className="text-gray-200 text-sm md:text-base">إدارة القصص التي قمت بإنشائها</p>
+              <p className="text-slate-700 text-sm md:text-base">إدارة القصص التي قمت بإنشائها</p>
             </div>
             <div className="flex gap-2 md:gap-3 w-full md:w-auto">
               <Button
@@ -190,7 +191,7 @@ export default function TeacherStoriesPage() {
             >
               <Card>
                 <div className="flex justify-between items-center mb-4 md:mb-6">
-                  <h3 className="text-lg md:text-2xl font-bold text-white">تعديل القصة</h3>
+                  <h3 className="text-lg md:text-2xl font-bold text-ink">تعديل القصة</h3>
                   <Button
                     onClick={() => {
                       setShowEditForm(false)
@@ -199,6 +200,7 @@ export default function TeacherStoriesPage() {
                     variant="ghost"
                     size="sm"
                     icon={<X className="w-4 h-4" />}
+                    aria-label="إلغاء التعديل"
                   >
                     <span className="hidden sm:inline">إلغاء</span>
                   </Button>
@@ -221,27 +223,27 @@ export default function TeacherStoriesPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+              className="dialog-backdrop"
               onClick={() => setViewingStory(null)}
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-slate-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+                className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
               >
-                <div className="bg-gradient-to-r from-primary/20 to-secondary/20 p-4 md:p-6 border-b border-slate-700">
+                <div className="bg-white   p-4 md:p-6 border-b border-slate-200">
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
-                      <h2 className="text-lg md:text-2xl font-bold text-white mb-2 truncate">{viewingStory.title_arabic}</h2>
+                      <h2 className="text-lg md:text-2xl font-bold text-ink mb-2 truncate">{viewingStory.title_arabic}</h2>
                       <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm flex-wrap">
                         <span className={`px-2 py-1 md:px-3 md:py-1 rounded-full font-semibold text-xs ${
-                          viewingStory.difficulty === 'easy' ? 'bg-accent-green text-white' :
-                          viewingStory.difficulty === 'medium' ? 'bg-secondary text-ink' : 'bg-accent-red text-white'
+                          viewingStory.difficulty === 'easy' ? 'bg-accent-green text-ink' :
+                          viewingStory.difficulty === 'medium' ? 'bg-secondary text-ink' : 'bg-accent-red text-ink'
                         }`}>
                           {getDifficultyText(viewingStory.difficulty)}
                         </span>
-                        <span className="text-gray-300">الصف {viewingStory.grade_level}</span>
+                        <span className="text-slate-600">الصف {viewingStory.grade_level}</span>
                       </div>
                     </div>
                     <Button
@@ -249,7 +251,8 @@ export default function TeacherStoriesPage() {
                       variant="ghost"
                       size="sm"
                       icon={<X className="w-4 h-4" />}
-                      className="flex-shrink-0 ml-2"
+                      className="flex-shrink-0 ms-2"
+                      aria-label="إغلاق النافذة"
                     >
                       <span className="hidden sm:inline">إغلاق</span>
                     </Button>
@@ -258,7 +261,7 @@ export default function TeacherStoriesPage() {
 
                 <div className="p-3 md:p-6 overflow-y-auto flex-1">
                   <div className="prose prose-invert max-w-none">
-                    <div className="text-white text-lg leading-lax font-arabic whitespace-pre-wrap">
+                    <div className="text-ink text-lg leading-lax font-arabic whitespace-pre-wrap">
                       {viewingStory.content_arabic}
                     </div>
                   </div>
@@ -276,16 +279,16 @@ export default function TeacherStoriesPage() {
             {isLoading ? (
               <Card>
                 <div className="text-center py-12">
-                  <Clock className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-spin" />
-                  <p className="text-gray-200">جاري التحميل...</p>
+                  <Clock className="w-16 h-16 text-slate-500 mx-auto mb-4 animate-spin" />
+                  <p className="text-slate-700">جاري التحميل...</p>
                 </div>
               </Card>
             ) : stories.length === 0 ? (
               <Card>
                 <div className="text-center py-12">
-                  <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-white mb-2">لا توجد قصص حتى الآن</h3>
-                  <p className="text-gray-200 mb-6">ابدأ بإنشاء قصة جديدة!</p>
+                  <BookOpen className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-ink mb-2">لا توجد قصص حتى الآن</h3>
+                  <p className="text-slate-700 mb-6">ابدأ بإنشاء قصة جديدة!</p>
                   <Button
                     onClick={() => router.push('/teacher/stories/create')}
                     variant="primary"
@@ -304,33 +307,33 @@ export default function TeacherStoriesPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    <Card className="hover:shadow-lg transition-all h-full flex flex-col">
+                    <Card className="flex h-full flex-col transition-shadow hover:shadow-lg">
                       {/* Story Header */}
-                      <div className={`bg-gradient-to-r ${getDifficultyColor(story.difficulty)} p-3 md:p-4 rounded-t-lg -m-6 mb-4`}>
-                        <h3 className="text-base md:text-xl font-bold text-white mb-1 line-clamp-2">{story.title_arabic}</h3>
+                      <div className={`bg-white ${getDifficultyColor(story.difficulty)} p-3 md:p-4 rounded-t-lg -m-6 mb-4`}>
+                        <h3 className="text-base md:text-xl font-bold text-ink mb-1 line-clamp-2">{story.title_arabic}</h3>
                         <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm">
-                          <span className="bg-white/20 px-2 py-1 md:px-3 md:py-1 rounded-full text-white font-semibold text-xs">
+                          <span className="bg-white px-2 py-1 md:px-3 md:py-1 rounded-full text-ink font-semibold text-xs">
                             {getDifficultyText(story.difficulty)}
                           </span>
-                          <span className="text-white font-semibold">الصف {story.grade_level}</span>
+                          <span className="text-ink font-semibold">الصف {story.grade_level}</span>
                         </div>
                       </div>
 
                       {/* Story Content Preview */}
                       <div className="flex-1 mb-4">
-                        <p className="text-gray-300 text-xs md:text-sm line-clamp-3">
+                        <p className="text-slate-600 text-xs md:text-sm line-clamp-3">
                           {story.content_arabic.substring(0, 100)}...
                         </p>
                       </div>
 
                       {/* Story Info */}
-                      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
+                      <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
                         <Calendar className="w-4 h-4" />
                         <span>{new Date(story.created_at).toLocaleDateString('ar-SA')}</span>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex gap-2 pt-4 border-t border-slate-700">
+                      <div className="flex gap-2 pt-4 border-t border-slate-200">
                         <Button
                           onClick={() => setViewingStory(story)}
                           variant="success"
@@ -338,9 +341,9 @@ export default function TeacherStoriesPage() {
                           icon={<Eye className="w-3 h-3 md:w-4 md:h-4" />}
                           disabled={showEditForm || isClosingEdit}
                           className="flex-1 text-xs md:text-sm"
+                          aria-label={`عرض قصة ${story.title_arabic}`}
                         >
                           <span className="hidden sm:inline">عرض</span>
-                          <span className="sm:hidden">👁️</span>
                         </Button>
                         <Button
                           onClick={() => handleEdit(story)}
@@ -359,9 +362,9 @@ export default function TeacherStoriesPage() {
                           icon={<Trash2 className="w-3 h-3 md:w-4 md:h-4" />}
                           disabled={showEditForm && editingStory?.id !== story.id}
                           className="text-xs md:text-sm"
+                          aria-label={`حذف قصة ${story.title_arabic}`}
                         >
                           <span className="hidden sm:inline">حذف</span>
-                          <span className="sm:hidden">🗑️</span>
                         </Button>
                       </div>
                     </Card>
@@ -398,7 +401,7 @@ function EditStoryForm({ story, onSuccess }: { story: Story; onSuccess: () => vo
       
       await storiesService.updateStory(teacherAccessCode, story.id, formData)
       
-      toast.success('تم تعديل القصة بنجاح! 🎉')
+      toast.success('تم تعديل القصة بنجاح! ')
       onSuccess()
     } catch (error: any) {
       console.error('Error updating story:', error)
@@ -411,34 +414,34 @@ function EditStoryForm({ story, onSuccess }: { story: Story; onSuccess: () => vo
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-gray-300 font-semibold mb-2">العنوان</label>
+        <label className="block text-slate-600 font-semibold mb-2">العنوان</label>
         <input
           type="text"
           value={formData.title_arabic}
           onChange={(e) => setFormData({ ...formData, title_arabic: e.target.value })}
-          className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+          className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
           required
         />
       </div>
 
       <div>
-        <label className="block text-gray-300 font-semibold mb-2">المحتوى</label>
+        <label className="block text-slate-600 font-semibold mb-2">المحتوى</label>
         <textarea
           value={formData.content_arabic}
           onChange={(e) => setFormData({ ...formData, content_arabic: e.target.value })}
           rows={8}
-          className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none"
+          className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none"
           required
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-gray-300 font-semibold mb-2">الصعوبة</label>
+          <label className="block text-slate-600 font-semibold mb-2">الصعوبة</label>
           <select
             value={formData.difficulty}
             onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-            className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+            className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
             required
           >
             <option value="easy">سهل</option>
@@ -448,14 +451,14 @@ function EditStoryForm({ story, onSuccess }: { story: Story; onSuccess: () => vo
         </div>
 
         <div>
-          <label className="block text-gray-300 font-semibold mb-2">الصف الدراسي</label>
+          <label className="block text-slate-600 font-semibold mb-2">الصف الدراسي</label>
           <input
             type="number"
             value={formData.grade_level}
             onChange={(e) => setFormData({ ...formData, grade_level: parseInt(e.target.value) })}
             min="1"
             max="12"
-            className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold opacity-75 cursor-not-allowed"
+            className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold opacity-75 cursor-not-allowed"
             disabled={true}
           />
         </div>

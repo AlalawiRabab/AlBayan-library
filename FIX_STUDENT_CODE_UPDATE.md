@@ -63,7 +63,7 @@ WHERE id = student_id;
 ### ✅ الاختبار الناجح
 ```sql
 SELECT teacher_update_student_code(
-  'TEACH4A2025ZXVN',  -- رمز معلمة الصف الرابع
+  'TEACHER_ACCESS_CODE',  -- رمز معلمة الصف الرابع
   'student-id-here',   -- طالب في الصف الرابع (created_by = NULL)
   'NEWCODE123'         -- الرمز الجديد
 );

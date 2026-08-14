@@ -8,12 +8,13 @@ import { useRouter } from 'next/navigation'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import LoadingState from '@/components/LoadingState'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { 
   Shield, 
-  ArrowLeft, 
+  ArrowRight,
   Save,
   Eye,
   Edit,
@@ -45,7 +46,7 @@ interface TeacherPermission {
 const PERMISSION_CATEGORIES = {
   content: {
     name: 'إدارة المحتوى',
-    icon: '📚',
+    icon: '',
     permissions: [
       { name: 'create_stories', description: 'إنشاء قصص جديدة' },
       { name: 'edit_stories', description: 'تعديل القصص الموجودة' },
@@ -57,7 +58,7 @@ const PERMISSION_CATEGORIES = {
   },
   students: {
     name: 'إدارة الطلاب',
-    icon: '👥',
+    icon: '',
     permissions: [
       { name: 'create_students', description: 'إنشاء حسابات طلاب' },
       { name: 'view_students', description: 'عرض قائمة الطلاب' },
@@ -77,7 +78,7 @@ const PERMISSION_CATEGORIES = {
   },
   analytics: {
     name: 'التحليلات والتقارير',
-    icon: '📊',
+    icon: '',
     permissions: [
       { name: 'view_analytics', description: 'عرض التحليلات' },
       { name: 'export_data', description: 'تصدير البيانات' },
@@ -90,25 +91,25 @@ const PERMISSION_LEVELS = {
   full_access: {
     name: 'صلاحية كاملة',
     description: 'جميع الصلاحيات متاحة',
-    color: 'text-green-400',
+    color: 'text-emerald-700',
     icon: CheckCircle
   },
   limited_access: {
     name: 'صلاحية محدودة',
     description: 'صلاحيات محدودة حسب التصنيف',
-    color: 'text-yellow-400',
+    color: 'text-amber-700',
     icon: AlertTriangle
   },
   read_only: {
     name: 'قراءة فقط',
     description: 'عرض البيانات فقط بدون تعديل',
-    color: 'text-blue-400',
+    color: 'text-primary-700',
     icon: Eye
   },
   no_access: {
     name: 'بدون صلاحية',
     description: 'لا توجد صلاحيات متاحة',
-    color: 'text-red-400',
+    color: 'text-rose-700',
     icon: XCircle
   }
 }
@@ -253,7 +254,7 @@ export default function AdminPermissions() {
         throw error
       }
 
-      toast.success('تم تحديث مستوى الصلاحية بنجاح! 🎉')
+      toast.success('تم تحديث مستوى الصلاحية بنجاح! ')
       
       // Update local state
       setTeachers(teachers.map(teacher => 
@@ -335,7 +336,7 @@ export default function AdminPermissions() {
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen p-4 md:p-6" dir="rtl">
+      <div className="page-container min-h-screen" dir="rtl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -344,11 +345,11 @@ export default function AdminPermissions() {
           {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+              <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2 flex items-center gap-3">
                 <Shield className="w-10 h-10 text-primary" />
                 إدارة الصلاحيات
               </h1>
-              <p className="text-gray-300 text-lg font-semibold">
+              <p className="text-slate-600 text-lg font-semibold">
                 إدارة صلاحيات المعلمين والأذونات
               </p>
             </div>
@@ -356,7 +357,7 @@ export default function AdminPermissions() {
               onClick={() => router.back()}
               variant="ghost"
               size="md"
-              icon={<ArrowLeft className="w-5 h-5" />}
+              icon={<ArrowRight className="w-5 h-5" />}
             >
               العودة
             </Button>
@@ -366,20 +367,17 @@ export default function AdminPermissions() {
             {/* Teachers List */}
             <div className="lg:col-span-1">
               <Card>
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <h3 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
                   <Users className="w-6 h-6 text-primary" />
                   قائمة المعلمين
                 </h3>
 
                 {isLoading ? (
-                  <div className="text-center py-8">
-                    <div className="text-4xl mb-2 animate-spin">⏳</div>
-                    <p className="text-gray-400">جاري التحميل...</p>
-                  </div>
+                  <LoadingState compact />
                 ) : teachers.length === 0 ? (
                   <div className="text-center py-8">
                     <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400">لا يوجد معلمون</p>
+                    <p className="text-slate-500">لا يوجد معلمون</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -392,17 +390,17 @@ export default function AdminPermissions() {
                           key={teacher.teacher_id}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
-                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                          className={`cursor-pointer rounded-lg border-2 p-4 transition-[border-color,background-color,box-shadow] ${
                             selectedTeacher?.teacher_id === teacher.teacher_id
                               ? 'border-primary bg-primary/10'
-                              : 'border-slate-700 bg-slate-800/50 hover:bg-slate-800'
+                              : 'border-slate-200 bg-white hover:bg-white'
                           }`}
                           onClick={() => setSelectedTeacher(teacher)}
                         >
                           <div className="flex items-center gap-3">
                             <IconComponent className={`w-5 h-5 ${levelInfo.color}`} />
                             <div className="flex-1">
-                              <h4 className="text-white font-bold">{teacher.teacher_name}</h4>
+                              <h4 className="text-ink font-bold">{teacher.teacher_name}</h4>
                               <p className={`text-sm font-semibold ${levelInfo.color}`}>
                                 {levelInfo.name}
                               </p>
@@ -424,10 +422,10 @@ export default function AdminPermissions() {
                   <Card>
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-2">
+                        <h3 className="text-2xl font-bold text-ink mb-2">
                           {selectedTeacher.teacher_name}
                         </h3>
-                        <p className="text-gray-300 font-semibold">
+                        <p className="text-slate-600 font-semibold">
                           {PERMISSION_LEVELS[selectedTeacher.permission_level as keyof typeof PERMISSION_LEVELS].description}
                         </p>
                       </div>
@@ -455,7 +453,7 @@ export default function AdminPermissions() {
                   <div className="space-y-4">
                     {Object.entries(PERMISSION_CATEGORIES).map(([categoryKey, category]) => (
                       <Card key={categoryKey}>
-                        <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <h4 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
                           <span className="text-2xl">{category.icon}</span>
                           {category.name}
                         </h4>
@@ -467,18 +465,18 @@ export default function AdminPermissions() {
                             return (
                               <div
                                 key={permissionId}
-                                className={`p-3 rounded-lg border-2 transition-all ${
+                                className={`rounded-lg border-2 p-3 transition-[border-color,background-color] ${
                                   isEnabled
                                     ? 'border-accent-green bg-accent-green/10'
-                                    : 'border-slate-700 bg-slate-800/50'
+                                    : 'border-slate-200 bg-white'
                                 }`}
                               >
                                 <div className="flex items-center justify-between">
                                   <div>
-                                    <h5 className="text-white font-semibold">
+                                    <h5 className="text-ink font-semibold">
                                       {permission.description}
                                     </h5>
-                                    <p className="text-gray-400 text-sm">
+                                    <p className="text-slate-500 text-sm">
                                       {permission.name}
                                     </p>
                                   </div>
@@ -507,8 +505,8 @@ export default function AdminPermissions() {
               ) : (
                 <Card className="text-center py-12">
                   <Shield className="w-20 h-20 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-white mb-2">اختر معلم</h3>
-                  <p className="text-gray-400">اختر معلم من القائمة لعرض صلاحياته</p>
+                  <h3 className="text-xl font-bold text-ink mb-2">اختر معلم</h3>
+                  <p className="text-slate-500">اختر معلم من القائمة لعرض صلاحياته</p>
                 </Card>
               )}
             </div>
@@ -521,8 +519,8 @@ export default function AdminPermissions() {
             transition={{ delay: 0.5 }}
             className="mt-8"
           >
-            <Card className="bg-gradient-to-r from-primary/20 to-secondary/20">
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Card className="bg-white  ">
+              <h3 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
                 <Settings className="w-6 h-6" />
                 مستويات الصلاحية
               </h3>
@@ -532,8 +530,8 @@ export default function AdminPermissions() {
                   return (
                     <div key={level} className="text-center">
                       <IconComponent className={`w-8 h-8 mx-auto mb-2 ${info.color}`} />
-                      <h4 className="text-white font-bold mb-1">{info.name}</h4>
-                      <p className="text-gray-300 text-sm">{info.description}</p>
+                      <h4 className="text-ink font-bold mb-1">{info.name}</h4>
+                      <p className="text-slate-600 text-sm">{info.description}</p>
                     </div>
                   )
                 })}

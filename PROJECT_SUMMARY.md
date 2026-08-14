@@ -132,8 +132,8 @@ npm run dev
 open http://localhost:3000
 
 # 5. Test with demo accounts
-# Admin: ADMIN2025
-# Teacher: TEACH3A2025
+# Admin: use the active admin code stored securely outside the repository
+# Teacher: use the assigned teacher code
 # Student: (requires registration)
 ```
 
@@ -243,13 +243,13 @@ See `DATABASE_SCHEMA.md` for complete documentation.
 ### Test Accounts Included
 
 **Admin**
-- Code: `ADMIN2025`
+- Code: use the active admin code stored securely outside the repository
 - Full system access
 
 **Teachers**
-- Grade 3: `TEACH3A2025`
-- Grade 4: `TEACH4A2025`
-- Grade 6: `TEACH6A2025`
+- Grade 3: use the assigned teacher code
+- Grade 4: use the assigned teacher code
+- Grade 6: use the assigned teacher code
 
 **Students**
 - Can generate codes from teacher dashboard

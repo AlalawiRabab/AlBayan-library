@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
@@ -11,6 +12,8 @@ import { useRouter } from 'next/navigation'
 import toast, { Toaster } from 'react-hot-toast'
 import { Trophy, Crown, Medal, Users, BookOpen, LogIn, UserCheck, Shield, GraduationCap } from 'lucide-react'
 import { showPageLoader } from '@/components/PageTransitionLoader'
+import Dialog from '@/components/Dialog'
+import { FormField, TextInput } from '@/components/FormField'
 
 interface LeaderboardEntry {
   id: string
@@ -103,7 +106,7 @@ const loadLeaderboard = async () => {
         // Student registration
         const student = await authService.registerStudent(accessCode, studentName)
         setUser(student, 'student')
-        toast.success(`مرحباً ${studentName}! تم إنشاء حسابك بنجاح 🎉`)
+        toast.success(`مرحباً ${studentName}! تم إنشاء حسابك بنجاح `)
         showPageLoader()
         router.push('/student')
       } else {
@@ -112,7 +115,7 @@ const loadLeaderboard = async () => {
         
         if (result.type === 'student') {
           setUser(result.user, result.type)
-          toast.success(`مرحباً ${result.user.name}! 👦`)
+          toast.success(`مرحباً ${result.user.name}! `)
           showPageLoader()
           router.push('/student')
         } else {
@@ -133,7 +136,7 @@ const loadLeaderboard = async () => {
       
       if (error.message.includes('not found')) {
         setNeedsRegistration(true)
-        toast('هذا أول دخول لك! الرجاء إدخال اسمك', { icon: '👋' })
+        toast('هذا أول دخول لك! الرجاء إدخال اسمك', { icon: '' })
       } else {
         toast.error(error.message)
       }
@@ -144,39 +147,31 @@ const loadLeaderboard = async () => {
 
   return (
     <AnimatedBackground>
-      <div className="w-full min-h-screen flex items-center justify-center px-2 sm:px-3 md:px-4 py-4 overflow-x-hidden" dir="rtl">
+      <div className="flex min-h-screen w-full items-center justify-center overflow-x-hidden px-4 py-10 sm:px-6 lg:px-8" dir="rtl">
         <div className="max-w-7xl w-full">
           {/* Header */}
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-4 md:mb-6"
+            className="mb-8 text-center"
           >
             <div className="flex flex-col items-center gap-0.5 mb-2">
-              <motion.div
-                animate={{ 
-                  y: [0, -5, 0],
-                  scale: [1, 1.02, 1]
-                }}
-                transition={{ 
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: 'easeInOut'
-                }}
-                className="relative"
-              >
-                <img 
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative">
+                <Image
                   src="/logow.png" 
                   alt="البيان" 
-                  className="w-40 h-40 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-80 lg:h-80 object-contain drop-shadow-2xl"
+                  width={224}
+                  height={128}
+                  priority
+                  className="h-28 w-48 object-contain sm:h-32 sm:w-56"
                 />
               </motion.div>
-              <h1 className="text-xl md:text-4xl font-bold text-white">
+              <h1 className="font-heading text-3xl font-extrabold text-ink md:text-4xl">
                 البيان
               </h1>
             </div>
-            <p className="text-sm md:text-base text-gray-300 mb-2">
+            <p className="mx-auto mb-2 max-w-2xl text-sm text-slate-600 md:text-base">
               منصة تعليمية تفاعلية لتعلم اللغة العربية
             </p>
           </motion.div>
@@ -188,22 +183,22 @@ const loadLeaderboard = async () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mb-4 md:mb-6"
           >
-            <Card className="p-2 sm:p-2.5 md:p-3 overflow-hidden">
+            <Card className="overflow-hidden p-4 sm:p-5 md:p-6" elevation="sm">
               <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
                 <Trophy className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
-                <h2 className="text-lg md:text-xl font-bold text-white">جدول الترتيب (الصفوف 3، 5، 6)</h2>
+                <h2 className="text-lg md:text-xl font-bold text-ink">جدول الترتيب (الصفوف 3، 5، 6)</h2>
               </div>
               
               {isLoadingLeaderboard ? (
                 <div className="text-center py-2">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                  <p className="text-gray-300 mt-1 text-sm">جاري تحميل الترتيب...</p>
+                  <p className="text-slate-600 mt-1 text-sm">جاري تحميل الترتيب...</p>
                 </div>
               ) : leaderboard.length === 0 ? (
                 <div className="text-center py-2">
-                  <Users className="w-8 h-8 text-gray-400 mx-auto mb-1" />
-                  <p className="text-gray-300 text-sm">لا يوجد طلاب مقيمون في هذه الصفوف بعد</p>
-                  <p className="text-gray-400 text-xs">كن أول من ينضم إلى المكتبة!</p>
+                  <Users className="w-8 h-8 text-slate-500 mx-auto mb-1" />
+                  <p className="text-slate-600 text-sm">لا يوجد طلاب مقيمون في هذه الصفوف بعد</p>
+                  <p className="text-slate-500 text-xs">كن أول من ينضم إلى المكتبة!</p>
                 </div>
               ) : (
                 <>
@@ -217,21 +212,21 @@ const loadLeaderboard = async () => {
                         transition={{ duration: 0.6, delay: 0.2 }}
                         className="flex flex-col items-center"
                       >
-                        <div className="bg-gradient-to-b from-gray-300 to-gray-400 text-slate-900 w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                        <div className="bg-white   text-slate-900 w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-2 md:mb-3">
                           <Medal className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
                         </div>
-                        <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-2 md:p-4 text-center w-full md:w-auto md:min-w-[120px] md:max-w-[120px]">
-                          <h3 className="text-xs sm:text-sm md:text-lg font-bold text-white break-words leading-tight px-1">{leaderboard[1].name}</h3>
-                          <p className="text-[10px] sm:text-xs md:text-sm text-gray-300">المركز الثاني</p>
+                        <div className="w-full rounded-lg bg-slate-50 p-2 text-center md:w-auto md:min-w-[120px] md:max-w-[120px] md:p-4">
+                          <h3 className="text-xs sm:text-sm md:text-lg font-bold text-ink break-words leading-tight px-1">{leaderboard[1].name}</h3>
+                          <p className="text-[10px] sm:text-xs md:text-sm text-slate-600">المركز الثاني</p>
                           {leaderboard[1].current_title && (
-                            <div className="text-xs bg-gray-600/50 text-gray-300 px-2 py-1 rounded-full mt-1 truncate">
-                              🏅 {leaderboard[1].current_title}
+                            <div className="mt-1 truncate rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                               {leaderboard[1].current_title}
                             </div>
                           )}
-                          <div className="text-lg md:text-xl font-bold text-gray-300 mt-2">{leaderboard[1].combined_score}</div>
+                          <div className="text-lg md:text-xl font-bold text-slate-600 mt-2">{leaderboard[1].combined_score}</div>
                           {leaderboard[1].avg_grade && (
-                            <div className="text-xs md:text-sm text-purple-300 mt-1">
-                              معدل: {Math.round(leaderboard[1].avg_grade)}%
+                            <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                              معدل: <bdi dir="ltr">{Math.round(leaderboard[1].avg_grade)}%</bdi>
                             </div>
                           )}
                         </div>
@@ -246,21 +241,21 @@ const loadLeaderboard = async () => {
                         transition={{ duration: 0.6, delay: 0.1 }}
                         className="flex flex-col items-center"
                       >
-                        <div className="bg-gradient-to-b from-yellow-400 to-yellow-600 text-white w-14 h-14 sm:w-16 sm:h-16 md:w-24 md:h-24 rounded-full flex items-center justify-center mb-2 md:mb-3 shadow-lg">
+                        <div className="bg-white   text-ink w-14 h-14 sm:w-16 sm:h-16 md:w-24 md:h-24 rounded-full flex items-center justify-center mb-2 md:mb-3 shadow-lg">
                           <Crown className="w-6 h-6 sm:w-7 sm:h-7 md:w-10 md:h-10" />
                         </div>
-                        <div className="bg-gradient-to-r from-slate-700 to-slate-800 backdrop-blur-sm rounded-lg p-2 md:p-4 text-center w-full md:w-auto md:min-w-[140px] md:max-w-[140px] border-2 border-yellow-500/30">
-                          <h3 className="text-sm sm:text-base md:text-xl font-bold text-white break-words leading-tight px-1">{leaderboard[0].name}</h3>
-                          <p className="text-[10px] sm:text-xs md:text-sm text-yellow-300">المركز الأول</p>
+                        <div className="w-full rounded-lg border-2 border-amber-200/30 bg-white p-2 text-center md:w-auto md:min-w-[140px] md:max-w-[140px] md:p-4">
+                          <h3 className="text-sm sm:text-base md:text-xl font-bold text-ink break-words leading-tight px-1">{leaderboard[0].name}</h3>
+                          <p className="text-[10px] sm:text-xs md:text-sm text-amber-700">المركز الأول</p>
                           {leaderboard[0].current_title && (
-                            <div className="text-xs bg-yellow-500/20 text-yellow-200 px-2 py-1 rounded-full mt-1 truncate">
-                              🏅 {leaderboard[0].current_title}
+                            <div className="mt-1 truncate rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                               {leaderboard[0].current_title}
                             </div>
                           )}
-                          <div className="text-xl md:text-2xl font-bold text-yellow-300 mt-2">{leaderboard[0].combined_score}</div>
+                          <div className="text-xl md:text-2xl font-bold text-amber-700 mt-2">{leaderboard[0].combined_score}</div>
                           {leaderboard[0].avg_grade && (
-                            <div className="text-xs md:text-sm text-purple-300 mt-1">
-                              معدل: {Math.round(leaderboard[0].avg_grade)}%
+                            <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                              معدل: <bdi dir="ltr">{Math.round(leaderboard[0].avg_grade)}%</bdi>
                             </div>
                           )}
                         </div>
@@ -275,21 +270,21 @@ const loadLeaderboard = async () => {
                         transition={{ duration: 0.6, delay: 0.3 }}
                         className="flex flex-col items-center"
                       >
-                        <div className="bg-gradient-to-b from-amber-600 to-amber-700 text-white w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                        <div className="bg-white   text-ink w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-2 md:mb-3">
                           <Medal className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
                         </div>
-                        <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-2 md:p-4 text-center w-full md:w-auto md:min-w-[120px] md:max-w-[120px]">
-                          <h3 className="text-xs sm:text-sm md:text-lg font-bold text-white break-words leading-tight px-1">{leaderboard[2].name}</h3>
-                          <p className="text-xs md:text-sm text-gray-300">المركز الثالث</p>
+                        <div className="w-full rounded-lg bg-slate-50 p-2 text-center md:w-auto md:min-w-[120px] md:max-w-[120px] md:p-4">
+                          <h3 className="text-xs sm:text-sm md:text-lg font-bold text-ink break-words leading-tight px-1">{leaderboard[2].name}</h3>
+                          <p className="text-xs md:text-sm text-slate-600">المركز الثالث</p>
                           {leaderboard[2].current_title && (
-                            <div className="text-xs bg-amber-600/50 text-amber-300 px-2 py-1 rounded-full mt-1 truncate">
-                              🏅 {leaderboard[2].current_title}
+                            <div className="mt-1 truncate rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                               {leaderboard[2].current_title}
                             </div>
                           )}
-                          <div className="text-lg md:text-xl font-bold text-gray-300 mt-2">{leaderboard[2].combined_score}</div>
+                          <div className="text-lg md:text-xl font-bold text-slate-600 mt-2">{leaderboard[2].combined_score}</div>
                           {leaderboard[2].avg_grade && (
-                            <div className="text-xs md:text-sm text-purple-300 mt-1">
-                              معدل: {Math.round(leaderboard[2].avg_grade)}%
+                            <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                              معدل: <bdi dir="ltr">{Math.round(leaderboard[2].avg_grade)}%</bdi>
                             </div>
                           )}
                         </div>
@@ -307,21 +302,21 @@ const loadLeaderboard = async () => {
                           transition={{ duration: 0.6, delay: 0.4 }}
                           className="flex flex-col items-center"
                         >
-                          <div className="bg-gradient-to-b from-purple-400 to-purple-600 text-white w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                          <div className="bg-white   text-ink w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-3">
                             <Medal className="w-5 h-5 md:w-7 md:h-7" />
                           </div>
-                          <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-2 md:p-3 text-center min-w-full">
-                            <h3 className="text-sm md:text-base font-bold text-white break-words leading-tight px-1 mb-1">{leaderboard[3].name}</h3>
-                            <div className="text-xs md:text-sm text-gray-300 mb-1">المركز الرابع</div>
+                          <div className="min-w-full rounded-lg bg-slate-50 p-2 text-center md:p-3">
+                            <h3 className="text-sm md:text-base font-bold text-ink break-words leading-tight px-1 mb-1">{leaderboard[3].name}</h3>
+                            <div className="text-xs md:text-sm text-slate-600 mb-1">المركز الرابع</div>
                             {leaderboard[3].current_title && (
-                              <div className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full my-1 truncate">
-                                🏅 {leaderboard[3].current_title}
+                              <div className="text-xs bg-secondary-50 text-secondary-700 px-2 py-1 rounded-full my-1 truncate">
+                                 {leaderboard[3].current_title}
                               </div>
                             )}
-                            <div className="text-lg md:text-xl font-bold text-gray-300 mt-1">{leaderboard[3].combined_score}</div>
+                            <div className="text-lg md:text-xl font-bold text-slate-600 mt-1">{leaderboard[3].combined_score}</div>
                             {leaderboard[3].avg_grade && (
-                              <div className="text-xs md:text-sm text-purple-300 mt-1">
-                                معدل: {Math.round(leaderboard[3].avg_grade)}%
+                              <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                                معدل: <bdi dir="ltr">{Math.round(leaderboard[3].avg_grade)}%</bdi>
                               </div>
                             )}
                           </div>
@@ -335,21 +330,21 @@ const loadLeaderboard = async () => {
                           transition={{ duration: 0.6, delay: 0.5 }}
                           className="flex flex-col items-center"
                         >
-                          <div className="bg-gradient-to-b from-purple-400 to-purple-600 text-white w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-3">
+                          <div className="bg-white   text-ink w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-3">
                             <Medal className="w-5 h-5 md:w-7 md:h-7" />
                           </div>
-                          <div className="bg-slate-700/80 backdrop-blur-sm rounded-lg p-2 md:p-3 text-center min-w-full">
-                            <h3 className="text-sm md:text-base font-bold text-white break-words leading-tight px-1 mb-1">{leaderboard[4].name}</h3>
-                            <div className="text-xs md:text-sm text-gray-300 mb-1">المركز الخامس</div>
+                          <div className="min-w-full rounded-lg bg-slate-50 p-2 text-center md:p-3">
+                            <h3 className="text-sm md:text-base font-bold text-ink break-words leading-tight px-1 mb-1">{leaderboard[4].name}</h3>
+                            <div className="text-xs md:text-sm text-slate-600 mb-1">المركز الخامس</div>
                             {leaderboard[4].current_title && (
-                              <div className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full my-1 truncate">
-                                🏅 {leaderboard[4].current_title}
+                              <div className="text-xs bg-secondary-50 text-secondary-700 px-2 py-1 rounded-full my-1 truncate">
+                                 {leaderboard[4].current_title}
                               </div>
                             )}
-                            <div className="text-lg md:text-xl font-bold text-gray-300 mt-1">{leaderboard[4].combined_score}</div>
+                            <div className="text-lg md:text-xl font-bold text-slate-600 mt-1">{leaderboard[4].combined_score}</div>
                             {leaderboard[4].avg_grade && (
-                              <div className="text-xs md:text-sm text-purple-300 mt-1">
-                                معدل: {Math.round(leaderboard[4].avg_grade)}%
+                              <div className="text-xs md:text-sm text-secondary-700 mt-1">
+                                معدل: <bdi dir="ltr">{Math.round(leaderboard[4].avg_grade)}%</bdi>
                               </div>
                             )}
                           </div>
@@ -369,10 +364,10 @@ const loadLeaderboard = async () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="max-w-md mx-auto mb-4"
           >
-            <Card className="p-4 md:p-6 text-center hover:scale-105 transition-transform duration-200">
+            <Card className="p-5 text-center md:p-7" variant="interactive">
               <BookOpen className="w-12 h-12 md:w-16 md:h-16 text-accent-green mx-auto mb-3" />
-              <h3 className="text-lg md:text-xl font-bold text-white mb-2">تسجيل الدخول</h3>
-              <p className="text-gray-300 mb-4 text-sm md:text-base">تسجيل الدخول للطالب والمعلم</p>
+              <h3 className="text-lg md:text-xl font-bold text-ink mb-2">تسجيل الدخول</h3>
+              <p className="text-slate-600 mb-4 text-sm md:text-base">تسجيل الدخول للطالب والمعلم</p>
               <Button
                 onClick={() => setShowLoginForm(true)}
                 variant="success"
@@ -385,60 +380,33 @@ const loadLeaderboard = async () => {
             </Card>
           </motion.div>
 
-          {/* Login Form Modal */}
-          {showLoginForm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-50 overflow-y-auto"
-              onClick={() => setShowLoginForm(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-slate-800 rounded-xl p-3 md:p-4 w-full max-w-md my-4 md:my-8 max-h-[90vh] overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
-                  <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-accent-green flex-shrink-0" />
-                  <h3 className="text-lg md:text-xl font-bold text-white">
-                    تسجيل الدخول
-                  </h3>
-                </div>
-
-                <form onSubmit={handleLogin} className="space-y-3">
-                  <div>
-                    <label className="block text-gray-300 font-semibold mb-2">
-                      رمز الدخول
-                    </label>
-                    <input
+          <Dialog open={showLoginForm} onOpenChange={setShowLoginForm} title="تسجيل دخول الطالب" description="أدخل رمز الدخول الذي حصلت عليه من معلمك." size="sm">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <FormField id="student-access-code" label="رمز الدخول" required>
+                    <TextInput
+                      id="student-access-code"
                       type="text"
                       value={accessCode}
                       onChange={(e) => setAccessCode(e.target.value)}
                       placeholder="أدخل رمز الدخول"
-                      className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                      className="ltr-isolate font-mono font-bold tracking-wider"
                       required
                       disabled={isLoading}
                     />
-                  </div>
+                  </FormField>
 
                   {needsRegistration && (
-                    <div>
-                      <label className="block text-gray-300 font-semibold mb-2">
-                        اسمك الكامل
-                      </label>
-                      <input
+                    <FormField id="student-name" label="اسمك الكامل" required>
+                      <TextInput
+                        id="student-name"
                         type="text"
                         value={studentName}
                         onChange={(e) => setStudentName(e.target.value)}
                         placeholder="أدخل اسمك الكامل"
-                        className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
                         required
                         disabled={isLoading}
                       />
-                    </div>
+                    </FormField>
                   )}
 
                   <div className="flex gap-3">
@@ -467,9 +435,7 @@ const loadLeaderboard = async () => {
                     </Button>
                   </div>
                 </form>
-              </motion.div>
-            </motion.div>
-          )}
+          </Dialog>
         </div>
       </div>
 
@@ -478,9 +444,10 @@ const loadLeaderboard = async () => {
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#1E293B',
-            color: '#F1F5F9',
-            border: '1px solid #334155',
+            background: '#FFFFFF',
+            color: '#172033',
+            border: '1px solid #DBE4EE',
+            boxShadow: '0 12px 32px rgba(23, 32, 51, 0.12)',
           },
         }}
       />

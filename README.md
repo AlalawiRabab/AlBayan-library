@@ -39,7 +39,7 @@ A modern, beautiful, and interactive Arabic story library web app designed for k
 
 ## 🚀 Tech Stack
 
-- **Framework**: Next.js 14 with App Router
+- **Framework**: Next.js 16 with App Router
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Database**: Supabase (PostgreSQL)
@@ -51,7 +51,7 @@ A modern, beautiful, and interactive Arabic story library web app designed for k
 ## 📦 Installation
 
 ### Prerequisites
-- Node.js 18+ and npm
+- Node.js 20.9+ and npm
 - Supabase account and project
 - Git
 
@@ -72,8 +72,13 @@ A modern, beautiful, and interactive Arabic story library web app designed for k
    ```
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   NEXT_PUBLIC_APP_NAME=المكتبة الإلكترونية للقصص
+   GROQ_API_KEY=your_rotated_groq_api_key
+   AUTO_GRADING_RPC_SECRET=your_high_entropy_server_secret
    ```
+
+   `GROQ_API_KEY` and `AUTO_GRADING_RPC_SECRET` are server-only. Never prefix
+   them with `NEXT_PUBLIC_`. The grading secret must match the SHA-256 value
+   configured in the deployed `secure-auto-grading` Edge Function.
 
 4. **Run the development server**
    ```bash
@@ -88,13 +93,13 @@ A modern, beautiful, and interactive Arabic story library web app designed for k
 The database is pre-seeded with test accounts:
 
 **Admin**
-- Code: `ADMIN2025`
+- Code: use the active admin code stored securely outside the repository
 - Permissions: Full system control
 
 **Teachers**
-- Grade 3: `TEACH3A2025`
-- Grade 4: `TEACH4A2025`
-- Grade 6: `TEACH6A2025`
+- Grade 3: use the assigned teacher code
+- Grade 4: use the assigned teacher code
+- Grade 6: use the assigned teacher code
 
 **Students**
 - Use any generated code from teacher dashboard

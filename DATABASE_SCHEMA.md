@@ -18,15 +18,15 @@
 
 ### Admin Account
 - **Name:** المسؤول الرئيسي
-- **Access Code:** `ADMIN2025`
+- **Access Code:** stored securely outside the repository
 - **Permissions:** Full system control
 
 ### Teacher Accounts
 | Grade | Name | Access Code | Permissions |
 |-------|------|-------------|-------------|
-| 3 | معلمة الصف الثالث | `TEACH3A2025` | full_access |
-| 4 | معلمة الصف الرابع | `TEACH4A2025` | full_access |
-| 6 | معلمة الصف السادس | `TEACH6A2025` | full_access |
+| 3 | معلمة الصف الثالث | assigned teacher code | full_access |
+| 4 | معلمة الصف الرابع | assigned teacher code | full_access |
+| 6 | معلمة الصف السادس | assigned teacher code | full_access |
 
 ---
 

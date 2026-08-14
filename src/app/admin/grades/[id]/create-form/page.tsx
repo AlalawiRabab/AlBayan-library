@@ -7,12 +7,12 @@ import { supabase } from '@/lib/supabase'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowRight, Save } from 'lucide-react'
 
 export default function CreateForm() {
   const router = useRouter()
   const params = useParams()
-  const { userRole } = useAppStore()
+  const { userRole, hydrated } = useAppStore()
   const gradeId = params.id as string
   
   const [form, setForm] = useState({
@@ -25,12 +25,13 @@ export default function CreateForm() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
+    if (!hydrated) return
     if (userRole !== 'admin') {
       router.push('/')
       return
     }
     loadStories()
-  }, [userRole, router])
+  }, [hydrated, userRole, router])
 
   const loadStories = async () => {
     try {
@@ -94,7 +95,7 @@ export default function CreateForm() {
 
       if (error) throw error
 
-      toast.success('تم إنشاء النموذج بنجاح! 🎉')
+      toast.success('تم إنشاء النموذج بنجاح! ')
       router.push(`/admin/grades/${gradeId}`)
     } catch (error) {
       console.error('Error creating form:', error)
@@ -105,16 +106,16 @@ export default function CreateForm() {
   }
 
   return (
-    <div className="min-h-screen bg-cloud p-4 md:p-6">
+    <div className="page-container min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">إضافة نموذج جديد</h1>
+          <h1 className="text-3xl font-bold text-ink">إضافة نموذج جديد</h1>
           <Button
             onClick={() => router.push(`/admin/grades/${gradeId}`)}
             variant="ghost"
             size="md"
-            icon={<ArrowLeft className="w-4 h-4" />}
+            icon={<ArrowRight className="w-4 h-4" />}
           >
             العودة
           </Button>
@@ -127,7 +128,7 @@ export default function CreateForm() {
               <p className="text-secondary text-sm">
                 هذا النموذج ستكون للصف {gradeId}
               </p>
-              <p className="text-gray-300 text-xs mt-2">
+              <p className="text-slate-600 text-xs mt-2">
                 لإضافة الأسئلة، قم بإنشاء النموذج أولاً ثم استخدم زر التعديل
               </p>
             </div>
@@ -135,23 +136,23 @@ export default function CreateForm() {
             {isLoadingStories ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-gray-300 mt-4">جاري تحميل القصص...</p>
+                <p className="text-slate-600 mt-4">جاري تحميل القصص...</p>
               </div>
             ) : stories.length === 0 ? (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                <p className="text-yellow-300">
+              <div className="bg-amber-50/10 border border-amber-200/30 rounded-lg p-4">
+                <p className="text-amber-700">
                   لا توجد قصص لهذا الصف، يرجى إنشاء قصة أولاً
                 </p>
               </div>
             ) : (
               <div>
-                <label className="block text-gray-300 font-semibold mb-2">
+                <label className="block text-slate-600 font-semibold mb-2">
                   القصة المرتبطة
                 </label>
                 <select
                   value={form.story_id}
                   onChange={(e) => setForm({ ...form, story_id: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                   required
                   disabled={isSaving}
                 >
@@ -166,28 +167,28 @@ export default function CreateForm() {
             )}
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 عنوان النموذج
               </label>
               <input
                 type="text"
                 value={form.title_arabic}
                 onChange={(e) => setForm({ ...form, title_arabic: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 required
                 disabled={isSaving}
               />
             </div>
 
             <div>
-              <label className="block text-gray-300 font-semibold mb-2">
+              <label className="block text-slate-600 font-semibold mb-2">
                 وصف النموذج
               </label>
               <textarea
                 value={form.description_arabic}
                 onChange={(e) => setForm({ ...form, description_arabic: e.target.value })}
                 rows={5}
-                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none"
                 disabled={isSaving}
               />
             </div>

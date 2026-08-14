@@ -14,7 +14,7 @@ import toast, { Toaster } from 'react-hot-toast'
 import { 
   FileText, 
   Save, 
-  ArrowLeft, 
+  ArrowRight,
   Plus, 
   Trash2, 
   Eye,
@@ -203,7 +203,7 @@ export default function CreateForm() {
         return
       }
 
-      toast.success('تم إنشاء النموذج بنجاح! 🎉')
+      toast.success('تم إنشاء النموذج بنجاح! ')
       
       setTimeout(() => {
         router.push('/teacher')
@@ -227,7 +227,7 @@ export default function CreateForm() {
   return (
     <AnimatedBackground>
       <Toaster position="top-center" />
-      <div className="w-full min-h-screen p-4 md:p-6" dir="rtl">
+      <div className="page-container min-h-screen" dir="rtl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -236,11 +236,11 @@ export default function CreateForm() {
           {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+              <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2 flex items-center gap-3">
                 <FileText className="w-10 h-10 text-accent-green" />
                 إنشاء نموذج تحليل
               </h1>
-              <p className="text-gray-300 text-lg font-semibold">
+              <p className="text-slate-600 text-lg font-semibold">
                 إنشاء نموذج لتحليل القصص
               </p>
             </div>
@@ -248,7 +248,7 @@ export default function CreateForm() {
               onClick={() => router.back()}
               variant="ghost"
               size="md"
-              icon={<ArrowLeft className="w-5 h-5" />}
+              icon={<ArrowRight className="w-5 h-5" />}
             >
               العودة
             </Button>
@@ -259,7 +259,7 @@ export default function CreateForm() {
               {/* Form Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
-                  <label className="block text-white font-bold text-xl mb-3">
+                  <label className="block text-ink font-bold text-xl mb-3">
                     عنوان النموذج
                   </label>
                   <input
@@ -269,14 +269,14 @@ export default function CreateForm() {
                       setForm({ ...form, title_arabic: e.target.value })
                     }
                     placeholder="مثال: تحليل قصة القط الشجاع"
-                    className="w-full px-4 py-3 text-lg border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                    className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                     disabled={isSubmitting}
                     required
                   />
                 </Card>
 
                 <Card>
-                  <label className="block text-white font-bold text-xl mb-3">
+                  <label className="block text-ink font-bold text-xl mb-3">
                     القصة المرتبطة
                   </label>
                   <select
@@ -284,7 +284,7 @@ export default function CreateForm() {
                     onChange={(e) =>
                       setForm({ ...form, story_id: e.target.value })
                     }
-                    className="w-full px-4 py-3 text-lg border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                    className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                     disabled={isSubmitting}
                     required
                   >
@@ -300,7 +300,7 @@ export default function CreateForm() {
 
               {/* Description */}
               <Card>
-                <label className="block text-white font-bold text-xl mb-3">
+                <label className="block text-ink font-bold text-xl mb-3">
                   وصف النموذج
                 </label>
                 <textarea
@@ -310,7 +310,7 @@ export default function CreateForm() {
                   }
                   placeholder="وصف مختصر للنموذج..."
                   rows={3}
-                  className="w-full px-4 py-3 text-lg border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold resize-none"
+                  className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold resize-none"
                   disabled={isSubmitting}
                 />
               </Card>
@@ -318,7 +318,7 @@ export default function CreateForm() {
               {/* Questions */}
               <Card>
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-2xl font-bold text-white">الأسئلة</h3>
+                  <h3 className="text-2xl font-bold text-ink">الأسئلة</h3>
                   <Button
                     type="button"
                     onClick={addQuestion}
@@ -337,10 +337,10 @@ export default function CreateForm() {
                       key={question.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="bg-slate-800 p-6 rounded-lg border border-slate-700"
+                      className="bg-white p-6 rounded-lg border border-slate-200"
                     >
                       <div className="flex justify-between items-start mb-4">
-                        <h4 className="text-lg font-bold text-white">
+                        <h4 className="text-lg font-bold text-ink">
                           سؤال {index + 1}
                         </h4>
                         {questions.length > 1 && (
@@ -359,7 +359,7 @@ export default function CreateForm() {
 
                       {/* Question Text */}
                       <div className="mb-4">
-                        <label className="block text-gray-300 font-semibold mb-2">
+                        <label className="block text-slate-600 font-semibold mb-2">
                           نص السؤال
                         </label>
                         <input
@@ -369,14 +369,14 @@ export default function CreateForm() {
                             updateQuestion(question.id, 'text_arabic', e.target.value)
                           }
                           placeholder="اكتب السؤال هنا..."
-                          className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                          className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                           disabled={isSubmitting}
                         />
                       </div>
 
                       {/* Question Type */}
                       <div className="mb-4">
-                        <label className="block text-gray-300 font-semibold mb-2">
+                        <label className="block text-slate-600 font-semibold mb-2">
                           نوع السؤال
                         </label>
                         <div className="flex gap-4">
@@ -387,10 +387,10 @@ export default function CreateForm() {
                           ].map(({ value, label, icon: Icon }) => (
                             <label
                               key={value}
-                              className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all ${
+                              className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 transition-colors ${
                                 question.type === value
-                                  ? 'bg-primary text-white'
-                                  : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                                  ? 'bg-primary text-ink'
+                                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                               }`}
                             >
                               <input
@@ -414,7 +414,7 @@ export default function CreateForm() {
                       {/* Multiple Choice Options */}
                       {question.type === 'multiple_choice' && (
                         <div className="mb-4">
-                          <label className="block text-gray-300 font-semibold mb-2">
+                          <label className="block text-slate-600 font-semibold mb-2">
                             خيارات الإجابة
                           </label>
                           <div className="space-y-2">
@@ -427,7 +427,7 @@ export default function CreateForm() {
                                     updateOption(question.id, optionIndex, e.target.value)
                                   }
                                   placeholder={`خيار ${optionIndex + 1}`}
-                                  className="flex-1 px-3 py-2 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-slate-900 text-white"
+                                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white text-ink"
                                   disabled={isSubmitting}
                                 />
                                 <Button
@@ -455,14 +455,14 @@ export default function CreateForm() {
                           {/* Correct Answer Selector */}
                           {(question.options || []).length > 0 && (
                             <div className="mt-4">
-                              <label className="block text-gray-300 font-semibold mb-2 flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4 text-green-400" />
+                              <label className="block text-slate-600 font-semibold mb-2 flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-emerald-700" />
                                 الإجابة الصحيحة
                               </label>
                               <select
                                 value={question.correct_answer || ''}
                                 onChange={(e) => setCorrectAnswer(question.id, e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-slate-700 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-slate-900 text-white font-semibold"
+                                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                                 disabled={isSubmitting}
                               >
                                 <option value="">اختر الإجابة الصحيحة</option>
@@ -486,12 +486,12 @@ export default function CreateForm() {
                           onChange={(e) =>
                             updateQuestion(question.id, 'required', e.target.checked)
                           }
-                          className="w-4 h-4 text-primary bg-slate-900 border-slate-600 rounded focus:ring-primary"
+                          className="w-4 h-4 text-primary bg-white border-slate-200 rounded focus:ring-primary"
                           disabled={isSubmitting}
                         />
                         <label
                           htmlFor={`required-${question.id}`}
-                          className="text-gray-300 font-semibold cursor-pointer"
+                          className="text-slate-600 font-semibold cursor-pointer"
                         >
                           سؤال إجباري
                         </label>
@@ -507,17 +507,17 @@ export default function CreateForm() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <Card className="bg-gradient-to-br from-primary/10 to-secondary/10">
-                    <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Card className="bg-white  ">
+                    <h3 className="text-2xl font-bold text-ink mb-4 flex items-center gap-2">
                       <Eye className="w-6 h-6" />
                       معاينة النموذج
                     </h3>
-                    <div className="bg-slate-900 p-6 rounded-lg">
-                      <h4 className="text-2xl font-bold text-white mb-4">
+                    <div className="bg-white p-6 rounded-lg">
+                      <h4 className="text-2xl font-bold text-ink mb-4">
                         {form.title_arabic}
                       </h4>
                       {form.description_arabic && (
-                        <p className="text-gray-300 mb-6 font-semibold">
+                        <p className="text-slate-600 mb-6 font-semibold">
                           {form.description_arabic}
                         </p>
                       )}
@@ -525,18 +525,18 @@ export default function CreateForm() {
                         {questions
                           .filter(q => q.text_arabic)
                           .map((question, index) => (
-                            <div key={question.id} className="border-b border-slate-700 pb-4">
-                              <h5 className="text-lg font-bold text-white mb-2">
+                            <div key={question.id} className="border-b border-slate-200 pb-4">
+                              <h5 className="text-lg font-bold text-ink mb-2">
                                 {index + 1}. {question.text_arabic}
                                 {question.required && (
-                                  <span className="text-accent-red mr-2">*</span>
+                                  <span className="text-accent-red me-2">*</span>
                                 )}
                               </h5>
                               {question.type === 'short_answer' && (
                                 <input
                                   type="text"
                                   disabled
-                                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-gray-400"
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-500"
                                   placeholder="إجابة قصيرة..."
                                 />
                               )}
@@ -544,7 +544,7 @@ export default function CreateForm() {
                                 <textarea
                                   disabled
                                   rows={3}
-                                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-gray-400 resize-none"
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-500 resize-none"
                                   placeholder="إجابة طويلة..."
                                 />
                               )}
@@ -553,7 +553,7 @@ export default function CreateForm() {
                                   {(question.options || []).map((option, optionIndex) => (
                                     <label
                                       key={optionIndex}
-                                      className="flex items-center gap-2 text-gray-300"
+                                      className="flex items-center gap-2 text-slate-600"
                                     >
                                       <input
                                         type="radio"
