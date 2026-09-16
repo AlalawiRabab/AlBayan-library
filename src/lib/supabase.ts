@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { useAppStore } from './store'
+import { validateTeacherName } from './teacherName'
 import { getAudioExtensionFromMime, normalizeMimeType } from './utils'
 
 // Use placeholder values during build time if env vars are not set
@@ -544,14 +545,14 @@ export const adminService = {
     // Check if we have a current user in the store
     const { user } = useAppStore.getState()
     if (!user) {
-      throw new Error('No user logged in')
+      throw new Error('غير مصرح')
     }
     
     // Re-authenticate to ensure session context is set
     const accessCode = (user as any).access_code as string
     const authResult = await authService.loginWithAccessCode(accessCode)
     if (authResult.type !== 'admin') {
-      throw new Error('User is not an admin')
+      throw new Error('غير مصرح')
     }
     
     return authResult.user
@@ -588,6 +589,39 @@ export const adminService = {
     })
 
     if (error) throw error
+    return data
+  },
+
+  /** Name-only update via dedicated RPC (server re-validates admin + name). */
+  async updateTeacherName(teacherId: string, rawName: string) {
+    const validated = validateTeacherName(rawName)
+    if (!validated.ok) {
+      throw new Error(validated.error)
+    }
+
+    const admin = await this.ensureAdminContext()
+
+    const { data, error } = await supabase.rpc('admin_update_teacher_name', {
+      target_teacher_id: teacherId,
+      new_teacher_name: validated.name,
+      admin_access_code: admin.access_code,
+    })
+
+    if (error) {
+      // Do not surface RPC/SQL detail or auth internals to the UI.
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized') || msg.includes('not an admin') || msg.includes('no user')) {
+        throw new Error('غير مصرح')
+      }
+      if (msg.includes('invalid name')) {
+        throw new Error('الاسم غير صالح')
+      }
+      if (msg.includes('not found')) {
+        throw new Error('تعذر تحديث الاسم')
+      }
+      throw new Error('تعذر تحديث الاسم')
+    }
+
     return data
   },
 
