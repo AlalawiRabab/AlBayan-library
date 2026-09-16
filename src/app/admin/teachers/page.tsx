@@ -8,9 +8,11 @@ import { useRouter } from 'next/navigation'
 import AnimatedBackground from '@/components/AnimatedBackground'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import Dialog from '@/components/Dialog'
 import LoadingState from '@/components/LoadingState'
 import { useAppStore } from '@/lib/store'
 import { adminService, supabase } from '@/lib/supabase'
+import { validateTeacherName } from '@/lib/teacherName'
 import toast, { Toaster } from 'react-hot-toast'
 import { 
   Users, 
@@ -39,7 +41,7 @@ interface Teacher {
 
 export default function AdminTeacherManagement() {
   const router = useRouter()
-  const { user, userRole, hydrated } = useAppStore()
+  const { userRole, hydrated } = useAppStore()
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
@@ -49,8 +51,9 @@ export default function AdminTeacherManagement() {
     assigned_grade: 3,
     permission_level: 'full_access'
   })
-  const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null)
+  const [nameEditTeacher, setNameEditTeacher] = useState<Teacher | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [nameEditError, setNameEditError] = useState('')
   const [isSavingName, setIsSavingName] = useState(false)
 
   useEffect(() => {
@@ -129,37 +132,65 @@ export default function AdminTeacherManagement() {
     try {
       await navigator.clipboard.writeText(accessCode)
       toast.success('تم نسخ رمز الوصول!')
-    } catch (error) {
+    } catch {
       toast.error('فشل نسخ رمز الوصول')
     }
   }
 
-  const startEditingName = (teacher: Teacher) => {
-    setEditingTeacherId(teacher.id)
-    setEditingName(teacher.name)
-  }
-
-  const cancelEditingName = () => {
-    setEditingTeacherId(null)
-    setEditingName('')
-  }
-
-  const saveTeacherName = async (teacherId: string) => {
-    const name = editingName?.trim()
-    if (!name) {
-      toast.error('الرجاء إدخال الاسم')
+  const openNameEditDialog = (teacher: Teacher) => {
+    if (userRole !== 'admin') {
+      toast.error('غير مصرح')
       return
     }
+    setNameEditTeacher(teacher)
+    setEditingName(teacher.name)
+    setNameEditError('')
+  }
+
+  const closeNameEditDialog = (open: boolean) => {
+    if (isSavingName) return
+    if (!open) {
+      setNameEditTeacher(null)
+      setEditingName('')
+      setNameEditError('')
+    }
+  }
+
+  const saveTeacherName = async () => {
+    if (!nameEditTeacher) return
+    if (userRole !== 'admin') {
+      toast.error('غير مصرح')
+      return
+    }
+
+    const validated = validateTeacherName(editingName)
+    if (!validated.ok) {
+      setNameEditError(validated.error)
+      toast.error(validated.error)
+      return
+    }
+
+    const confirmed = window.confirm(
+      'هل تريدين تعديل اسم المعلمة؟ لن يتغير البريد أو كلمة المرور أو الصلاحيات.'
+    )
+    if (!confirmed) return
+
     try {
       setIsSavingName(true)
-      await adminService.updateTeacher(teacherId, { name })
-      toast.success('تم تحديث اسم المعلم بنجاح')
-      setEditingTeacherId(null)
+      setNameEditError('')
+      await adminService.updateTeacherName(nameEditTeacher.id, validated.name)
+      setTeachers((prev) =>
+        prev.map((t) =>
+          t.id === nameEditTeacher.id ? { ...t, name: validated.name } : t
+        )
+      )
+      toast.success('تم تعديل اسم المعلمة بنجاح')
+      setNameEditTeacher(null)
       setEditingName('')
-      loadTeachers()
-    } catch (error: any) {
-      console.error('Error updating teacher name:', error)
-      toast.error(error?.message || 'فشل تحديث الاسم')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل تحديث الاسم'
+      // Never log access codes or raw RPC payloads.
+      toast.error(message)
     } finally {
       setIsSavingName(false)
     }
@@ -374,49 +405,19 @@ export default function AdminTeacherManagement() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
                           <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
-                          {editingTeacherId === teacher.id ? (
-                            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                              <input
-                                type="text"
-                                value={editingName}
-                                onChange={(e) => setEditingName(e.target.value)}
-                                className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg border-2 border-slate-200 bg-white text-ink font-bold text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                placeholder="اسم المعلم"
-                                disabled={isSavingName}
-                                dir="rtl"
-                              />
-                              <Button
-                                onClick={() => saveTeacherName(teacher.id)}
-                                variant="primary"
-                                size="sm"
-                                disabled={isSavingName || !editingName.trim()}
-                              >
-                                {isSavingName ? '...' : 'حفظ'}
-                              </Button>
-                              <Button
-                                onClick={cancelEditingName}
-                                variant="ghost"
-                                size="sm"
-                                disabled={isSavingName}
-                              >
-                                إلغاء
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <h3 className="text-base md:text-xl font-bold text-ink truncate">
-                                {teacher.name}
-                              </h3>
-                              <Button
-                                onClick={() => startEditingName(teacher)}
-                                variant="ghost"
-                                size="sm"
-                                icon={<Edit className="w-3 h-3 md:w-4 md:h-4" />}
-                                title="تعديل الاسم"
-                              >
-                                <span className="sr-only md:not-sr-only md:me-1">تعديل الاسم</span>
-                              </Button>
-                            </>
+                          <h3 className="text-base md:text-xl font-bold text-ink truncate">
+                            {teacher.name}
+                          </h3>
+                          {userRole === 'admin' && (
+                            <Button
+                              onClick={() => openNameEditDialog(teacher)}
+                              variant="ghost"
+                              size="sm"
+                              icon={<Edit className="w-3 h-3 md:w-4 md:h-4" />}
+                              title="تعديل الاسم"
+                            >
+                              تعديل الاسم
+                            </Button>
                           )}
                           <span className={`px-2 py-1 rounded-full text-xs md:text-sm font-bold flex-shrink-0 ${
                             teacher.is_active
@@ -508,6 +509,73 @@ export default function AdminTeacherManagement() {
           </Card>
         </motion.div>
       </div>
+
+      <Dialog
+        open={!!nameEditTeacher}
+        onOpenChange={closeNameEditDialog}
+        title="تعديل اسم المعلمة"
+        description="لن يتغير البريد أو كلمة المرور أو الصلاحيات."
+        size="sm"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="md"
+              onClick={() => closeNameEditDialog(false)}
+              disabled={isSavingName}
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={saveTeacherName}
+              isLoading={isSavingName}
+              disabled={isSavingName}
+            >
+              حفظ
+            </Button>
+          </>
+        }
+      >
+        {nameEditTeacher && (
+          <div className="space-y-4" dir="rtl">
+            <div>
+              <label className="block text-slate-600 font-semibold mb-2">الاسم الحالي</label>
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-ink">
+                {nameEditTeacher.name}
+              </p>
+            </div>
+            <div>
+              <label htmlFor="teacher-new-name" className="block text-slate-600 font-semibold mb-2">
+                الاسم الجديد
+              </label>
+              <input
+                id="teacher-new-name"
+                type="text"
+                value={editingName}
+                onChange={(e) => {
+                  setEditingName(e.target.value)
+                  setNameEditError('')
+                }}
+                maxLength={100}
+                disabled={isSavingName}
+                className="w-full rounded-lg border-2 border-slate-200 bg-white px-4 py-3 font-semibold text-ink focus:outline-none focus:ring-4 focus:ring-primary"
+                placeholder="أدخلي الاسم الجديد"
+                dir="rtl"
+                autoComplete="off"
+              />
+              {nameEditError ? (
+                <p className="mt-2 text-sm font-semibold text-rose-600">{nameEditError}</p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">بين 2 و100 محرفًا. يُسمح بالأسماء العربية والمسافات.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </Dialog>
     </AnimatedBackground>
   )
 }
