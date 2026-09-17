@@ -1,7 +1,12 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
 
-const EXPECTED_SECRET_HASH = 'e4eba8cbed3078244cf9b2171cb8b9829a2d056a94cd2781ca0006d80d85d29d'
+// Temporary dual-accept: legacy production hash + newly rotated Vercel secret hash.
+// Remove the legacy entry after all callers migrate.
+const EXPECTED_SECRET_HASHES = [
+  'e4eba8cbed3078244cf9b2171cb8b9829a2d056a94cd2781ca0006d80d85d29d',
+  '305c7641887c0f0733c41d4fd5914bc98864017d022ab5356ec13b929a6ff1dc'
+] as const
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MAX_BODY_LENGTH = 100_000
 const MAX_ANSWER_LENGTH = 8_000
@@ -44,6 +49,15 @@ function constantTimeEqual(left: string, right: string) {
     difference |= left.charCodeAt(index) ^ right.charCodeAt(index)
   }
   return difference === 0
+}
+
+function matchesExpectedSecretHash(suppliedHash: string) {
+  let matched = false
+  for (const expected of EXPECTED_SECRET_HASHES) {
+    // Evaluate every candidate to avoid short-circuit timing hints.
+    matched = constantTimeEqual(suppliedHash, expected) || matched
+  }
+  return matched
 }
 
 async function sha256(value: string) {
@@ -339,7 +353,7 @@ Deno.serve(async request => {
 
   const suppliedSecret = request.headers.get('x-auto-grading-secret') || ''
   const suppliedHash = suppliedSecret ? await sha256(suppliedSecret) : ''
-  if (!suppliedHash || !constantTimeEqual(suppliedHash, EXPECTED_SECRET_HASH)) {
+  if (!suppliedHash || !matchesExpectedSecretHash(suppliedHash)) {
     return respond(401, { error: 'Unauthorized' })
   }
 
