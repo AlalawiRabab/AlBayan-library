@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { useAppStore } from './store'
+import { validateClassroomName } from './classroomName'
 import { validateTeacherName } from './teacherName'
 import { getAudioExtensionFromMime, normalizeMimeType } from './utils'
 
@@ -88,17 +89,6 @@ export const studentsService = {
 }
 
 export const storiesService = {
-  async getStoriesByGrade(gradeLevel: number) {
-    const { data, error } = await supabase
-      .from('stories')
-      .select('*')
-      .eq('grade_level', gradeLevel)
-      .order('difficulty', { ascending: true })
-
-    if (error) throw error
-    return data
-  },
-
   async getStudentStories(studentAccessCode: string) {
     const { data, error } = await supabase.rpc('student_get_stories', {
       student_access_code: studentAccessCode
@@ -493,48 +483,38 @@ export const analyticsService = {
     return data?.[0] || null
   },
 
-  async getAdminAnalytics(adminAccessCode: string) {
+  async getAdminAnalytics(_adminAccessCode: string) {
     try {
-      console.log('getAdminAnalytics called with:', adminAccessCode)
-      console.log('Supabase client configured:', !!supabase)
-      
-      console.log('Calling admin_get_analytics RPC directly...')
+      // Prefer store-backed admin session; do not log access codes.
+      const { user } = useAppStore.getState()
+      const accessCode =
+        (user && 'access_code' in user && typeof (user as { access_code?: string }).access_code === 'string'
+          ? (user as { access_code: string }).access_code
+          : _adminAccessCode)
+
       const { data, error } = await supabase.rpc('admin_get_analytics', {
-        admin_access_code: adminAccessCode
+        admin_access_code: accessCode
       })
 
-      console.log('RPC response:', { data, error })
-
       if (error) {
-        console.error('RPC error:', error)
         throw error
       }
-      
-      console.log('Raw data from RPC:', data)
-      console.log('First element:', data?.[0])
-      
-      // Handle different response formats
+
       let analyticsData = null
-      
+
       if (Array.isArray(data) && data.length > 0) {
-        // Check if it's in format: [{"admin_get_analytics": {...}}]
         if (data[0]?.admin_get_analytics) {
           analyticsData = data[0].admin_get_analytics
-        } 
-        // Check if it's in format: [{...}] (direct data)
-        else if (data[0] && typeof data[0] === 'object') {
+        } else if (data[0] && typeof data[0] === 'object') {
           analyticsData = data[0]
         }
       } else if (data && typeof data === 'object') {
-        // Direct object response
         analyticsData = data
       }
-      
-      console.log('Extracted analytics data:', analyticsData)
-      console.log('Returning data:', analyticsData)
+
       return analyticsData
     } catch (error) {
-      console.error('Error in getAdminAnalytics:', error)
+      console.error('Error in getAdminAnalytics')
       throw error
     }
   },
@@ -622,6 +602,126 @@ export const adminService = {
       throw new Error('تعذر تحديث الاسم')
     }
 
+    return data
+  },
+
+  /** Classroom display-name only (id/grade/teacher_id unchanged). */
+  async updateClassroomName(classroomId: string, rawName: string) {
+    const validated = validateClassroomName(rawName)
+    if (!validated.ok) {
+      throw new Error(validated.error)
+    }
+
+    const admin = await this.ensureAdminContext()
+
+    const { data, error } = await supabase.rpc('admin_update_classroom_name', {
+      target_classroom_id: classroomId,
+      new_classroom_name: validated.name,
+      admin_access_code: admin.access_code,
+    })
+
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized') || msg.includes('not an admin') || msg.includes('no user')) {
+        throw new Error('غير مصرح')
+      }
+      if (msg.includes('invalid name')) {
+        throw new Error('الاسم غير صالح')
+      }
+      if (msg.includes('not found')) {
+        throw new Error('تعذر تحديث الاسم')
+      }
+      throw new Error('تعذر تحديث الاسم')
+    }
+
+    return data
+  },
+
+  async getGradeStories(gradeNum: number) {
+    const admin = await this.ensureAdminContext()
+    const { data, error } = await supabase.rpc('admin_get_grade_stories', {
+      grade_num: gradeNum,
+      admin_access_code: admin.access_code,
+    })
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized')) throw new Error('غير مصرح')
+      throw new Error('تعذر تحميل القصص')
+    }
+    return data || []
+  },
+
+  async getStory(storyId: string) {
+    const admin = await this.ensureAdminContext()
+    const { data, error } = await supabase.rpc('admin_get_story', {
+      target_story_id: storyId,
+      admin_access_code: admin.access_code,
+    })
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized')) throw new Error('غير مصرح')
+      throw new Error('تعذر تحميل القصة')
+    }
+    return (data && data[0]) || null
+  },
+
+  async createStory(input: {
+    title_arabic: string
+    content_arabic: string
+    difficulty: string
+    grade_level: number
+  }) {
+    const admin = await this.ensureAdminContext()
+    const { data, error } = await supabase.rpc('admin_create_story', {
+      story_title: input.title_arabic,
+      story_content: input.content_arabic,
+      story_difficulty: input.difficulty,
+      story_grade: input.grade_level,
+      admin_access_code: admin.access_code,
+    })
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized')) throw new Error('غير مصرح')
+      if (msg.includes('invalid')) throw new Error('بيانات غير صالحة')
+      throw new Error('فشل إنشاء القصة')
+    }
+    return data
+  },
+
+  async updateStory(
+    storyId: string,
+    input: { title_arabic: string; content_arabic: string; difficulty: string }
+  ) {
+    const admin = await this.ensureAdminContext()
+    const { data, error } = await supabase.rpc('admin_update_story', {
+      target_story_id: storyId,
+      story_title: input.title_arabic,
+      story_content: input.content_arabic,
+      story_difficulty: input.difficulty,
+      admin_access_code: admin.access_code,
+    })
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized')) throw new Error('غير مصرح')
+      if (msg.includes('invalid')) throw new Error('بيانات غير صالحة')
+      if (msg.includes('not found')) throw new Error('القصة غير موجودة')
+      throw new Error('فشل تحديث القصة')
+    }
+    return data
+  },
+
+  async deleteStory(storyId: string) {
+    const admin = await this.ensureAdminContext()
+    const { data, error } = await supabase.rpc('admin_delete_story', {
+      target_story_id: storyId,
+      admin_access_code: admin.access_code,
+    })
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized')) throw new Error('غير مصرح')
+      if (msg.includes('not found')) throw new Error('القصة غير موجودة')
+      throw new Error('فشل حذف القصة')
+    }
     return data
   },
 

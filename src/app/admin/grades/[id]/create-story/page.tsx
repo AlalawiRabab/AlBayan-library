@@ -1,25 +1,24 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { useRouter, useParams } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
+import { adminService } from '@/lib/supabase'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import toast from 'react-hot-toast'
-import { ArrowRight, Save, Plus } from 'lucide-react'
+import { ArrowRight, Save } from 'lucide-react'
 
 export default function CreateStory() {
   const router = useRouter()
   const params = useParams()
-  const { user, userRole, hydrated } = useAppStore()
+  const { userRole, hydrated } = useAppStore()
   const gradeId = params.id as string
-  
+
   const [story, setStory] = useState({
     title_arabic: '',
     content_arabic: '',
-    difficulty: 'easy' as 'easy' | 'medium' | 'hard'
+    difficulty: 'easy' as 'easy' | 'medium' | 'hard',
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -41,41 +40,17 @@ export default function CreateStory() {
 
     try {
       setIsSaving(true)
-
-      // Find a teacher assigned to this grade to be the author
-      const { data: teacherData } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('assigned_grade', parseInt(gradeId))
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      let authorId = null
-      if (teacherData) {
-        authorId = teacherData.id
-      }
-
-      const { data, error } = await supabase
-        .from('stories')
-        .insert({
-          title_arabic: story.title_arabic,
-          content_arabic: story.content_arabic,
-          difficulty: story.difficulty,
-          grade_level: parseInt(gradeId),
-          author_teacher_id: authorId,
-          is_active: true
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
+      await adminService.createStory({
+        title_arabic: story.title_arabic,
+        content_arabic: story.content_arabic,
+        difficulty: story.difficulty,
+        grade_level: parseInt(gradeId, 10),
+      })
       toast.success('تم إنشاء القصة بنجاح! ')
       router.push(`/admin/grades/${gradeId}`)
-    } catch (error) {
-      console.error('Error creating story:', error)
-      toast.error('فشل إنشاء القصة')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل إنشاء القصة'
+      toast.error(message)
     } finally {
       setIsSaving(false)
     }
@@ -84,7 +59,6 @@ export default function CreateStory() {
   return (
     <div className="page-container min-h-screen">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-ink">إضافة قصة جديدة</h1>
           <Button
@@ -97,19 +71,14 @@ export default function CreateStory() {
           </Button>
         </div>
 
-        {/* Form */}
         <Card className="p-6">
           <form onSubmit={handleSave} className="space-y-4">
             <div className="bg-primary-50 border border-primary-200/30 rounded-lg p-4">
-              <p className="text-primary-700 text-sm">
-                هذه القصة ستكون للصف {gradeId}
-              </p>
+              <p className="text-primary-700 text-sm">هذه القصة ستكون للصف {gradeId}</p>
             </div>
 
             <div>
-              <label className="block text-slate-600 font-semibold mb-2">
-                عنوان القصة
-              </label>
+              <label className="block text-slate-600 font-semibold mb-2">عنوان القصة</label>
               <input
                 type="text"
                 value={story.title_arabic}
@@ -121,9 +90,7 @@ export default function CreateStory() {
             </div>
 
             <div>
-              <label className="block text-slate-600 font-semibold mb-2">
-                محتوى القصة
-              </label>
+              <label className="block text-slate-600 font-semibold mb-2">محتوى القصة</label>
               <textarea
                 value={story.content_arabic}
                 onChange={(e) => setStory({ ...story, content_arabic: e.target.value })}
@@ -135,12 +102,12 @@ export default function CreateStory() {
             </div>
 
             <div>
-              <label className="block text-slate-600 font-semibold mb-2">
-                مستوى الصعوبة
-              </label>
+              <label className="block text-slate-600 font-semibold mb-2">مستوى الصعوبة</label>
               <select
                 value={story.difficulty}
-                onChange={(e) => setStory({ ...story, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
+                onChange={(e) =>
+                  setStory({ ...story, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })
+                }
                 className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 disabled={isSaving}
               >
@@ -177,4 +144,3 @@ export default function CreateStory() {
     </div>
   )
 }
-

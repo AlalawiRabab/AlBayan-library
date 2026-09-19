@@ -13,10 +13,27 @@ import { supabase } from '@/lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { BookOpen, Save, ArrowRight, FileText } from 'lucide-react'
 
+type ActiveClassroom = {
+  classroom_id: string
+  classroom_name: string
+  grade: number
+}
+
 export default function CreateStory() {
   const router = useRouter()
   const { user, userRole, hydrated } = useAppStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [classroomsLoading, setClassroomsLoading] = useState(true)
+  const [hasActiveClassroom, setHasActiveClassroom] = useState(false)
+  const [linkedGrade, setLinkedGrade] = useState<number | null>(null)
+  const [classroomLabel, setClassroomLabel] = useState('')
+
+  const [story, setStory] = useState({
+    title_arabic: '',
+    content_arabic: '',
+    difficulty: 'easy' as 'easy' | 'medium' | 'hard',
+    grade_level: null as number | null,
+  })
 
   useEffect(() => {
     if (!hydrated) return
@@ -24,20 +41,84 @@ export default function CreateStory() {
       router.replace('/')
     }
   }, [hydrated, router, userRole])
-  
-  // Get teacher's assigned grade
-  const teacherData = user as any
-  const assignedGrade = teacherData?.assigned_grade || 3
-  
-  const [story, setStory] = useState({
-    title_arabic: '',
-    content_arabic: '',
-    difficulty: 'easy' as 'easy' | 'medium' | 'hard',
-    grade_level: assignedGrade,
-  })
+
+  useEffect(() => {
+    if (!hydrated || userRole !== 'teacher') return
+
+    const teacher = user as { access_code?: string; assigned_grade?: number } | null
+    const accessCode = teacher?.access_code
+    if (!accessCode) {
+      setClassroomsLoading(false)
+      setHasActiveClassroom(false)
+      setLinkedGrade(null)
+      return
+    }
+
+    let cancelled = false
+
+    const loadClassrooms = async () => {
+      setClassroomsLoading(true)
+      try {
+        const { data, error } = await supabase.rpc('teacher_get_active_classrooms', {
+          teacher_access_code: accessCode,
+        })
+
+        if (cancelled) return
+
+        if (error) {
+          console.error('Error loading teacher classrooms:', error)
+          setHasActiveClassroom(false)
+          setLinkedGrade(null)
+          setClassroomLabel('')
+          return
+        }
+
+        const list = (data || []) as ActiveClassroom[]
+        if (list.length === 0) {
+          setHasActiveClassroom(false)
+          setLinkedGrade(null)
+          setClassroomLabel('')
+          setStory((prev) => ({ ...prev, grade_level: null }))
+          return
+        }
+
+        const assigned = teacher?.assigned_grade
+        const preferred =
+          typeof assigned === 'number'
+            ? list.find((c) => c.grade === assigned) ?? list[0]
+            : list[0]
+
+        setHasActiveClassroom(true)
+        setLinkedGrade(preferred.grade)
+        setClassroomLabel(preferred.classroom_name || `الصف ${preferred.grade}`)
+        setStory((prev) => ({ ...prev, grade_level: preferred.grade }))
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Error loading teacher classrooms:', err)
+          setHasActiveClassroom(false)
+          setLinkedGrade(null)
+        }
+      } finally {
+        if (!cancelled) setClassroomsLoading(false)
+      }
+    }
+
+    void loadClassrooms()
+    return () => {
+      cancelled = true
+    }
+  }, [hydrated, userRole, user])
+
+  const canPublish =
+    hasActiveClassroom && linkedGrade != null && story.grade_level != null && !classroomsLoading
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!canPublish) {
+      toast.error('لا يمكن النشر: لا يوجد فصل نشط مرتبط بحسابك')
+      return
+    }
 
     if (!story.title_arabic.trim()) {
       toast.error('الرجاء إدخال عنوان القصة')
@@ -57,25 +138,33 @@ export default function CreateStory() {
     try {
       setIsSubmitting(true)
 
-      const teacherData = user as any
+      const teacherData = user as { access_code?: string } | null
+      if (!teacherData?.access_code || story.grade_level == null) {
+        toast.error('لا يمكن النشر: لا يوجد فصل نشط مرتبط بحسابك')
+        return
+      }
 
-      // Use the new teacher_create_story function
-      const { data, error } = await supabase.rpc('teacher_create_story', {
+      const { error } = await supabase.rpc('teacher_create_story', {
         story_title: story.title_arabic,
         story_content: story.content_arabic,
         story_difficulty: story.difficulty,
         story_grade: story.grade_level,
-        teacher_access_code: teacherData.access_code
+        teacher_access_code: teacherData.access_code,
       })
 
       if (error) {
         console.error('Error creating story:', error)
-        toast.error(`فشل إنشاء القصة: ${error.message}`)
+        const msg = (error.message || '').toLowerCase()
+        if (msg.includes('فصل') || msg.includes('classroom') || msg.includes('غير مرتبط')) {
+          toast.error('لا يمكن النشر: لا يوجد فصل نشط مرتبط بهذا الصف')
+        } else {
+          toast.error('فشل إنشاء القصة')
+        }
         return
       }
 
       toast.success('تم إنشاء القصة بنجاح! ')
-      
+
       setTimeout(() => {
         router.push('/teacher')
       }, 1500)
@@ -100,7 +189,6 @@ export default function CreateStory() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-4xl mx-auto"
         >
-          {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2 flex items-center gap-3">
@@ -121,9 +209,16 @@ export default function CreateStory() {
             </Button>
           </div>
 
+          {!classroomsLoading && !hasActiveClassroom && (
+            <Card className="mb-6 border-2 border-rose-200 bg-rose-50">
+              <p className="text-rose-700 font-bold text-lg">
+                لا يمكن نشر قصة حاليًا: لا يوجد فصل نشط مرتبط بحسابك. يرجى التواصل مع المسؤولة لربط فصل نشط.
+              </p>
+            </Card>
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
-              {/* Title */}
               <Card>
                 <label className="block text-ink font-bold text-xl mb-3">
                   <FileText className="w-6 h-6 inline-block ms-2" />
@@ -137,12 +232,11 @@ export default function CreateStory() {
                   }
                   placeholder="مثال: القط الشجاع"
                   className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !canPublish}
                   required
                 />
               </Card>
 
-              {/* Difficulty & Grade */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                   <label className="block text-ink font-bold text-xl mb-3">
@@ -157,7 +251,7 @@ export default function CreateStory() {
                       })
                     }
                     className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !canPublish}
                   >
                     <option value="easy">سهل </option>
                     <option value="medium">متوسط </option>
@@ -170,21 +264,27 @@ export default function CreateStory() {
                     الصف الدراسي
                   </label>
                   <select
-                    value={story.grade_level}
+                    value={story.grade_level ?? ''}
                     className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg bg-white text-ink font-semibold opacity-75 cursor-not-allowed"
                     disabled={true}
                   >
-                    <option value={assignedGrade}>
-                      الصف {assignedGrade === 3 ? 'الثالث' : assignedGrade === 4 ? 'الرابع' : assignedGrade === 6 ? 'السادس' : assignedGrade}
-                    </option>
+                    {story.grade_level != null ? (
+                      <option value={story.grade_level}>
+                        الصف {story.grade_level}
+                        {classroomLabel ? ` — ${classroomLabel}` : ''}
+                      </option>
+                    ) : (
+                      <option value="">
+                        {classroomsLoading ? 'جاري التحميل...' : 'لا يوجد فصل نشط'}
+                      </option>
+                    )}
                   </select>
                   <p className="text-slate-500 text-sm mt-2">
-                    الصف المعين لك من قبل المشرف
+                    يُزامن تلقائيًا من الفصل النشط المرتبط بحسابك
                   </p>
                 </Card>
               </div>
 
-              {/* Content */}
               <Card>
                 <label className="block text-ink font-bold text-xl mb-3">
                   محتوى القصة
@@ -197,7 +297,7 @@ export default function CreateStory() {
                   placeholder="اكتب قصة رائعة هنا... (100 حرف على الأقل)"
                   rows={15}
                   className="w-full px-4 py-3 text-lg border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink leading-relaxed font-semibold resize-none"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !canPublish}
                   required
                 />
                 <div className="mt-2 flex justify-between text-sm">
@@ -216,8 +316,7 @@ export default function CreateStory() {
                 </div>
               </Card>
 
-              {/* Preview */}
-              {story.title_arabic && story.content_arabic && (
+              {story.title_arabic && story.content_arabic && story.grade_level != null && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -258,7 +357,6 @@ export default function CreateStory() {
                 </motion.div>
               )}
 
-              {/* Submit */}
               <div className="flex gap-4">
                 <Button
                   type="submit"
@@ -266,7 +364,7 @@ export default function CreateStory() {
                   size="lg"
                   className="flex-1"
                   isLoading={isSubmitting}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !canPublish}
                   icon={<Save className="w-5 h-5" />}
                 >
                   {isSubmitting ? 'جاري الحفظ...' : 'نشر القصة'}
@@ -288,4 +386,3 @@ export default function CreateStory() {
     </AnimatedBackground>
   )
 }
-

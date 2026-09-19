@@ -10,7 +10,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import LoadingState from '@/components/LoadingState'
 import { useAppStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
+import { analyticsService } from '@/lib/supabase'
 import toast, { Toaster } from 'react-hot-toast'
 import { 
   BarChart3, 
@@ -82,118 +82,82 @@ export default function AdminAnalytics() {
   const loadSystemAnalytics = async () => {
     try {
       setIsLoading(true)
-      
-      // Get comprehensive system data
-      const [
-        studentsResult,
-        teachersResult,
-        adminsResult,
-        storiesResult,
-        formsResult,
-        submissionsResult,
-        activityResult
-      ] = await Promise.all([
-        // User counts
-        supabase.from('students').select('id, last_login_at'),
-        supabase.from('teachers').select('id, last_login_at'),
-        supabase.from('admins').select('id, last_login_at'),
-        
-        // Content stats
-        supabase.from('stories').select('id, grade_level'),
-        supabase.from('form_templates').select('id'),
-        supabase.from('student_submissions').select('id, grade, submitted_at'),
-        
-        // Activity logs
-        supabase
-          .from('activity_logs')
-          .select('action_type, description_arabic, created_at, user_type')
-          .order('created_at', { ascending: false })
-          .limit(20)
-      ])
 
-      // Process the data
-      const students = studentsResult.data || []
-      const teachers = teachersResult.data || []
-      const admins = adminsResult.data || []
-      const stories = storiesResult.data || []
-      const forms = formsResult.data || []
-      const submissions = submissionsResult.data || []
-      const activities = activityResult.data || []
+      if (!user || !('access_code' in user)) {
+        throw new Error('غير مصرح')
+      }
 
-      // Calculate active users (logged in within last 7 days)
+      const raw = await analyticsService.getAdminAnalytics((user as { access_code: string }).access_code)
+      if (!raw || typeof raw !== 'object') {
+        throw new Error('لا توجد بيانات')
+      }
+
+      const data = raw as Record<string, unknown>
+      const studentsLogin = Array.isArray(data.students_login_data) ? data.students_login_data : []
+      const teachersLogin = Array.isArray(data.teachers_login_data) ? data.teachers_login_data : []
+      const adminsLogin = Array.isArray(data.admins_login_data) ? data.admins_login_data : []
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      const activeStudents = students.filter(s => new Date(s.last_login_at || 0) > weekAgo).length
-      const activeTeachers = teachers.filter(t => new Date(t.last_login_at || 0) > weekAgo).length
-      const activeAdmins = admins.filter(a => new Date(a.last_login_at || 0) > weekAgo).length
 
-      // Calculate grades and performance
-      const gradedSubmissions = submissions.filter(s => s.grade !== null)
-      const averageGrade = gradedSubmissions.length > 0 
-        ? gradedSubmissions.reduce((sum, s) => sum + (s.grade || 0), 0) / gradedSubmissions.length
-        : 0
+      const countActive = (rows: unknown[]) =>
+        rows.filter((row) => {
+          const loginAt = (row as { last_login_at?: string | null })?.last_login_at
+          return loginAt ? new Date(loginAt) > weekAgo : false
+        }).length
 
-      // Calculate completion rate
-      const completionRate = submissions.length > 0 
-        ? (gradedSubmissions.length / submissions.length) * 100
-        : 0
+      const activeUsers =
+        countActive(studentsLogin) + countActive(teachersLogin) + countActive(adminsLogin)
 
-      // Calculate engagement rate
-      const totalUsers = students.length + teachers.length + admins.length
-      const activeUsers = activeStudents + activeTeachers + activeAdmins
+      const totalStudents = Number(data.total_students ?? data.active_students ?? 0)
+      const totalTeachers = Number(data.total_teachers ?? data.active_teachers ?? 0)
+      const totalAdmins = Number(data.total_admins ?? 0)
+      const totalUsers = totalStudents + totalTeachers + totalAdmins
       const engagementRate = totalUsers > 0 ? (activeUsers / totalUsers) * 100 : 0
 
-      // Find top performing grade
-      const gradeStats = stories.reduce((acc: any, story) => {
-        const grade = story.grade_level
-        acc[grade] = (acc[grade] || 0) + 1
-        return acc
-      }, {})
-      const topPerformingGrade = Object.keys(gradeStats).reduce((a, b) => 
-        gradeStats[a] > gradeStats[b] ? a : b, '3'
-      )
-
-      // Process recent activity
-      const processedActivities = activities.map(activity => ({
-        type: activity.action_type,
-        description: activity.description_arabic,
-        timestamp: activity.created_at,
-        user_type: activity.user_type
-      }))
+      const recentActivityRaw = Array.isArray(data.recent_activity) ? data.recent_activity : []
+      const processedActivities = recentActivityRaw.map((activity) => {
+        const item = activity as Record<string, unknown>
+        return {
+          type: String(item.type ?? ''),
+          description: String(item.description ?? ''),
+          timestamp: String(item.timestamp ?? ''),
+          user_type: String(item.user_type ?? ''),
+        }
+      })
 
       setAnalytics({
         totalUsers: {
-          students: students.length,
-          teachers: teachers.length,
-          admins: admins.length
+          students: totalStudents,
+          teachers: totalTeachers,
+          admins: totalAdmins,
         },
         contentStats: {
-          totalStories: stories.length,
-          totalForms: forms.length,
-          totalSubmissions: submissions.length,
-          gradedSubmissions: gradedSubmissions.length
+          totalStories: Number(data.total_stories ?? 0),
+          totalForms: Number(data.total_forms ?? 0),
+          totalSubmissions: Number(data.total_submissions ?? 0),
+          gradedSubmissions: Number(data.graded_submissions ?? 0),
         },
         activityStats: {
-          dailyLogins: activeUsers,
+          dailyLogins: Number(data.daily_activity ?? activeUsers),
           weeklyLogins: activeUsers,
           monthlyLogins: activeUsers,
-          recentActivity: processedActivities
+          recentActivity: processedActivities,
         },
         performanceStats: {
-          averageGrade: Math.round(averageGrade),
-          completionRate: Math.round(completionRate),
+          averageGrade: Math.round(Number(data.average_grade ?? 0)),
+          completionRate: Math.round(Number(data.completion_rate ?? 0)),
           engagementRate: Math.round(engagementRate),
-          topPerformingGrade: parseInt(topPerformingGrade)
+          topPerformingGrade: Number(data.top_performing_grade ?? 3),
         },
         systemHealth: {
           uptime: '99.9%',
           lastBackup: new Date().toLocaleDateString('ar-SA'),
-          activeUsers: activeUsers,
-          systemLoad: 'منخفض'
-        }
+          activeUsers,
+          systemLoad: 'منخفض',
+        },
       })
-    } catch (error) {
-      console.error('Error loading system analytics:', error)
-      toast.error('فشل تحميل تحليلات النظام')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل تحميل تحليلات النظام'
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
