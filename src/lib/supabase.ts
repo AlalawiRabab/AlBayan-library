@@ -605,6 +605,41 @@ export const adminService = {
     return data
   },
 
+  /** List classrooms for admin grades page (no browser REST on classrooms). */
+  async listClassrooms() {
+    const admin = await this.ensureAdminContext()
+
+    const { data, error } = await supabase.rpc('admin_list_classrooms', {
+      admin_access_code: admin.access_code,
+    })
+
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('unauthorized') || msg.includes('not an admin') || msg.includes('no user')) {
+        throw new Error('غير مصرح')
+      }
+      throw new Error('تعذر تحميل الصفوف')
+    }
+
+    return (data || []).map((row: {
+      classroom_id: string
+      classroom_name: string
+      grade: number
+      teacher_name: string | null
+      students_count: number | string
+      is_active: boolean
+      created_at: string
+    }) => ({
+      id: row.classroom_id,
+      name: row.classroom_name,
+      grade: row.grade,
+      teacher_name: row.teacher_name || '',
+      students_count: Number(row.students_count) || 0,
+      is_active: row.is_active,
+      created_at: row.created_at,
+    }))
+  },
+
   /** Classroom display-name only (id/grade/teacher_id unchanged). */
   async updateClassroomName(classroomId: string, rawName: string) {
     const validated = validateClassroomName(rawName)

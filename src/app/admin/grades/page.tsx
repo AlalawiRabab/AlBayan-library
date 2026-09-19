@@ -42,6 +42,8 @@ interface Classroom {
   id: string
   name: string
   grade: number
+  teacher_name?: string
+  students_count?: number
   is_active: boolean
   created_at: string
 }
@@ -93,36 +95,52 @@ export default function GradeManagement() {
         throw new Error('Admin access code is unavailable')
       }
 
-      const overviewResponse = await fetch('/api/admin/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminAccessCode: user.access_code,
-          resource: 'overview'
-        })
-      })
-
-      const overview = await overviewResponse.json()
-      if (!overviewResponse.ok) {
-        throw new Error(overview.error || 'Failed to load admin overview')
+      // Classrooms via secure admin RPC (not REST / not edge overview).
+      try {
+        const listed = await adminService.listClassrooms()
+        setClassrooms(listed)
+      } catch (classroomError) {
+        console.error('Error loading classrooms via RPC:', classroomError)
+        setClassrooms([])
+        toast.error('فشل تحميل الصفوف المسجلة')
       }
 
-      setClassrooms(overview.classrooms || [])
-      setGradeStats(overview.stats || [])
-      setSubmissions(overview.submissions || [])
-      
-      // Load grades from database
+      // Overview (stats/submissions) is optional — must not block classrooms/grades.
+      try {
+        const overviewResponse = await fetch('/api/admin/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminAccessCode: user.access_code,
+            resource: 'overview'
+          })
+        })
+
+        const overview = await overviewResponse.json()
+        if (overviewResponse.ok) {
+          setGradeStats(overview.stats || [])
+          setSubmissions(overview.submissions || [])
+        } else {
+          console.error('Admin overview unavailable:', overview.error)
+          setGradeStats([])
+          setSubmissions([])
+        }
+      } catch (overviewError) {
+        console.error('Error loading admin overview:', overviewError)
+        setGradeStats([])
+        setSubmissions([])
+      }
+
       const { data: gradesData, error: gradesError } = await supabase
         .from('grades')
         .select('*')
         .order('id')
 
-      console.log('Grades loaded from DB:', gradesData)
-
       if (!gradesError && gradesData) {
         setGrades(gradesData)
       } else {
         console.error('Error loading grades:', gradesError)
+        setGrades([])
       }
     } catch (error) {
       console.error('Error loading grades:', error)
@@ -449,7 +467,7 @@ export default function GradeManagement() {
           </div>
         )}
 
-        {grades.length === 0 && !isLoading && (
+        {grades.length === 0 && classrooms.length === 0 && !isLoading && (
           <Card className="p-12 text-center">
             <GraduationCap className="w-16 h-16 text-slate-500 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-ink mb-2">لا توجد صفوف بعد</h3>
@@ -487,8 +505,9 @@ export default function GradeManagement() {
                   <thead>
                     <tr className="border-b-2 border-slate-200">
                       <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">الصف</th>
-                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden md:table-cell">الاسم</th>
-                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden lg:table-cell">الوصف</th>
+                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">الاسم</th>
+                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden md:table-cell">المعلمة</th>
+                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden lg:table-cell">عدد الطالبات</th>
                       <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">الحالة</th>
                       <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden md:table-cell">تاريخ الإنشاء</th>
                       <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">إجراءات</th>
@@ -506,8 +525,13 @@ export default function GradeManagement() {
                         <td className="py-3 px-2 md:py-4 md:px-4 font-bold text-ink text-xs md:text-sm">
                           الصف {classroom.grade}
                         </td>
-                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden md:table-cell text-xs md:text-sm">{classroom.name}</td>
-                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden lg:table-cell text-xs md:text-sm">-</td>
+                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 text-xs md:text-sm">{classroom.name}</td>
+                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden md:table-cell text-xs md:text-sm">
+                          {classroom.teacher_name || '—'}
+                        </td>
+                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden lg:table-cell text-xs md:text-sm">
+                          {classroom.students_count ?? 0}
+                        </td>
                         <td className="py-3 px-2 md:py-4 md:px-4">
                           <span className={`px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold ${
                             classroom.is_active
@@ -518,7 +542,9 @@ export default function GradeManagement() {
                           </span>
                         </td>
                         <td className="py-3 px-2 md:py-4 md:px-4 text-slate-500 text-xs md:text-sm hidden md:table-cell">
-                          {new Date(classroom.created_at).toLocaleDateString('ar-SA')}
+                          {classroom.created_at
+                            ? new Date(classroom.created_at).toLocaleDateString('ar-SA')
+                            : '—'}
                         </td>
                         <td className="py-3 px-2 md:py-4 md:px-4">
                           <Button
