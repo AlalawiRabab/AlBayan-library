@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
+import { adminService, supabase } from '@/lib/supabase'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import toast from 'react-hot-toast'
@@ -36,16 +36,11 @@ export default function CreateForm() {
   const loadStories = async () => {
     try {
       setIsLoadingStories(true)
-      const { data, error } = await supabase.rpc('admin_get_grade_stories', {
-        grade_num: parseInt(gradeId)
-      })
-
-      if (error) throw error
-
+      const data = await adminService.getGradeStories(parseInt(gradeId, 10))
       setStories(data || [])
-    } catch (error) {
-      console.error('Error loading stories:', error)
-      toast.error('فشل تحميل القصص')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل تحميل القصص'
+      toast.error(message)
     } finally {
       setIsLoadingStories(false)
     }

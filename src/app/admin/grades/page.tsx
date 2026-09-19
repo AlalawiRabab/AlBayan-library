@@ -4,9 +4,11 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
+import { adminService, supabase } from '@/lib/supabase'
+import { validateClassroomName } from '@/lib/classroomName'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
+import Dialog from '@/components/Dialog'
 import toast from 'react-hot-toast'
 import { 
   Plus, 
@@ -40,6 +42,8 @@ interface Classroom {
   id: string
   name: string
   grade: number
+  teacher_name?: string
+  students_count?: number
   is_active: boolean
   created_at: string
 }
@@ -66,6 +70,10 @@ export default function GradeManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingGrade, setEditingGrade] = useState<Grade | null>(null)
+  const [nameEditClassroom, setNameEditClassroom] = useState<Classroom | null>(null)
+  const [editingClassroomName, setEditingClassroomName] = useState('')
+  const [classroomNameError, setClassroomNameError] = useState('')
+  const [isSavingClassroomName, setIsSavingClassroomName] = useState(false)
   const [newGrade, setNewGrade] = useState({
     name: ''
   })
@@ -87,36 +95,52 @@ export default function GradeManagement() {
         throw new Error('Admin access code is unavailable')
       }
 
-      const overviewResponse = await fetch('/api/admin/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminAccessCode: user.access_code,
-          resource: 'overview'
-        })
-      })
-
-      const overview = await overviewResponse.json()
-      if (!overviewResponse.ok) {
-        throw new Error(overview.error || 'Failed to load admin overview')
+      // Classrooms via secure admin RPC (not REST / not edge overview).
+      try {
+        const listed = await adminService.listClassrooms()
+        setClassrooms(listed)
+      } catch (classroomError) {
+        console.error('Error loading classrooms via RPC:', classroomError)
+        setClassrooms([])
+        toast.error('فشل تحميل الصفوف المسجلة')
       }
 
-      setClassrooms(overview.classrooms || [])
-      setGradeStats(overview.stats || [])
-      setSubmissions(overview.submissions || [])
-      
-      // Load grades from database
+      // Overview (stats/submissions) is optional — must not block classrooms/grades.
+      try {
+        const overviewResponse = await fetch('/api/admin/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminAccessCode: user.access_code,
+            resource: 'overview'
+          })
+        })
+
+        const overview = await overviewResponse.json()
+        if (overviewResponse.ok) {
+          setGradeStats(overview.stats || [])
+          setSubmissions(overview.submissions || [])
+        } else {
+          console.error('Admin overview unavailable:', overview.error)
+          setGradeStats([])
+          setSubmissions([])
+        }
+      } catch (overviewError) {
+        console.error('Error loading admin overview:', overviewError)
+        setGradeStats([])
+        setSubmissions([])
+      }
+
       const { data: gradesData, error: gradesError } = await supabase
         .from('grades')
         .select('*')
         .order('id')
 
-      console.log('Grades loaded from DB:', gradesData)
-
       if (!gradesError && gradesData) {
         setGrades(gradesData)
       } else {
         console.error('Error loading grades:', gradesError)
+        setGrades([])
       }
     } catch (error) {
       console.error('Error loading grades:', error)
@@ -152,6 +176,63 @@ export default function GradeManagement() {
     } catch (error: any) {
       console.error('Error updating grade:', error)
       toast.error('فشل تحديث اسم الصف')
+    }
+  }
+
+  const openClassroomNameEdit = (classroom: Classroom) => {
+    if (userRole !== 'admin') {
+      toast.error('غير مصرح')
+      return
+    }
+    setNameEditClassroom(classroom)
+    setEditingClassroomName(classroom.name || '')
+    setClassroomNameError('')
+  }
+
+  const closeClassroomNameEdit = (open: boolean) => {
+    if (!open) {
+      setNameEditClassroom(null)
+      setEditingClassroomName('')
+      setClassroomNameError('')
+    }
+  }
+
+  const saveClassroomName = async () => {
+    if (!nameEditClassroom) return
+    if (userRole !== 'admin') {
+      toast.error('غير مصرح')
+      return
+    }
+
+    const validated = validateClassroomName(editingClassroomName)
+    if (!validated.ok) {
+      setClassroomNameError(validated.error)
+      toast.error(validated.error)
+      return
+    }
+
+    const confirmed = window.confirm(
+      'هل تريدين تعديل اسم الصف المعروض فقط؟ لن يتغير رقم الصف أو روابط المعلمات والطالبات والقصص.'
+    )
+    if (!confirmed) return
+
+    try {
+      setIsSavingClassroomName(true)
+      setClassroomNameError('')
+      await adminService.updateClassroomName(nameEditClassroom.id, validated.name)
+      setClassrooms((prev) =>
+        prev.map((c) =>
+          c.id === nameEditClassroom.id ? { ...c, name: validated.name } : c
+        )
+      )
+      toast.success('تم تعديل اسم الصف بنجاح')
+      setNameEditClassroom(null)
+      setEditingClassroomName('')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل تحديث الاسم'
+      toast.error(message)
+    } finally {
+      setIsSavingClassroomName(false)
     }
   }
 
@@ -386,7 +467,7 @@ export default function GradeManagement() {
           </div>
         )}
 
-        {grades.length === 0 && !isLoading && (
+        {grades.length === 0 && classrooms.length === 0 && !isLoading && (
           <Card className="p-12 text-center">
             <GraduationCap className="w-16 h-16 text-slate-500 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-ink mb-2">لا توجد صفوف بعد</h3>
@@ -424,10 +505,12 @@ export default function GradeManagement() {
                   <thead>
                     <tr className="border-b-2 border-slate-200">
                       <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">الصف</th>
-                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden md:table-cell">الاسم</th>
-                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden lg:table-cell">الوصف</th>
+                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">الاسم</th>
+                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden md:table-cell">المعلمة</th>
+                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden lg:table-cell">عدد الطالبات</th>
                       <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">الحالة</th>
                       <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600 hidden md:table-cell">تاريخ الإنشاء</th>
+                      <th className="text-start py-3 px-2 md:py-4 md:px-4 text-xs md:text-sm font-bold text-slate-600">إجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -442,8 +525,13 @@ export default function GradeManagement() {
                         <td className="py-3 px-2 md:py-4 md:px-4 font-bold text-ink text-xs md:text-sm">
                           الصف {classroom.grade}
                         </td>
-                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden md:table-cell text-xs md:text-sm">{classroom.name}</td>
-                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden lg:table-cell text-xs md:text-sm">-</td>
+                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 text-xs md:text-sm">{classroom.name}</td>
+                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden md:table-cell text-xs md:text-sm">
+                          {classroom.teacher_name || '—'}
+                        </td>
+                        <td className="py-3 px-2 md:py-4 md:px-4 text-slate-600 hidden lg:table-cell text-xs md:text-sm">
+                          {classroom.students_count ?? 0}
+                        </td>
                         <td className="py-3 px-2 md:py-4 md:px-4">
                           <span className={`px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold ${
                             classroom.is_active
@@ -454,7 +542,21 @@ export default function GradeManagement() {
                           </span>
                         </td>
                         <td className="py-3 px-2 md:py-4 md:px-4 text-slate-500 text-xs md:text-sm hidden md:table-cell">
-                          {new Date(classroom.created_at).toLocaleDateString('ar-SA')}
+                          {classroom.created_at
+                            ? new Date(classroom.created_at).toLocaleDateString('ar-SA')
+                            : '—'}
+                        </td>
+                        <td className="py-3 px-2 md:py-4 md:px-4">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openClassroomNameEdit(classroom)}
+                            icon={<Edit className="w-4 h-4" />}
+                            title="تعديل اسم الصف"
+                          >
+                            تعديل اسم الصف
+                          </Button>
                         </td>
                       </motion.tr>
                     ))}
@@ -556,6 +658,79 @@ export default function GradeManagement() {
           </motion.div>
         )}
       </div>
+
+      <Dialog
+        open={!!nameEditClassroom}
+        onOpenChange={closeClassroomNameEdit}
+        title="تعديل اسم الصف"
+        description="يُحدَّث الاسم المعروض فقط. لن يتغير رقم الصف أو روابط المعلمات والطالبات والقصص."
+        size="sm"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="md"
+              onClick={() => closeClassroomNameEdit(false)}
+              disabled={isSavingClassroomName}
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={saveClassroomName}
+              isLoading={isSavingClassroomName}
+              disabled={isSavingClassroomName}
+            >
+              حفظ
+            </Button>
+          </>
+        }
+      >
+        {nameEditClassroom && (
+          <div className="space-y-4" dir="rtl">
+            <div>
+              <label className="block text-slate-600 font-semibold mb-2">الصف الرقمي</label>
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-ink">
+                الصف {nameEditClassroom.grade}
+              </p>
+            </div>
+            <div>
+              <label className="block text-slate-600 font-semibold mb-2">الاسم الحالي</label>
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-ink">
+                {nameEditClassroom.name}
+              </p>
+            </div>
+            <div>
+              <label htmlFor="classroom-new-name" className="block text-slate-600 font-semibold mb-2">
+                الاسم الجديد
+              </label>
+              <input
+                id="classroom-new-name"
+                type="text"
+                value={editingClassroomName}
+                onChange={(e) => {
+                  setEditingClassroomName(e.target.value)
+                  setClassroomNameError('')
+                }}
+                maxLength={100}
+                disabled={isSavingClassroomName}
+                className="w-full rounded-lg border-2 border-slate-200 bg-white px-4 py-3 font-semibold text-ink focus:outline-none focus:ring-4 focus:ring-primary"
+                placeholder="أدخلي الاسم الجديد"
+                dir="rtl"
+                autoComplete="off"
+              />
+              {classroomNameError ? (
+                <p className="mt-2 text-sm font-semibold text-rose-600">{classroomNameError}</p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">بين 2 و100 محرفًا. يُسمح بالأسماء العربية والمسافات.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   )
 }

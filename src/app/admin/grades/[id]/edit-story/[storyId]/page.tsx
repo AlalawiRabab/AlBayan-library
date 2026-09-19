@@ -1,10 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { useRouter, useParams } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
-import { supabase } from '@/lib/supabase'
+import { adminService } from '@/lib/supabase'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import toast from 'react-hot-toast'
@@ -16,11 +15,11 @@ export default function EditStory() {
   const { userRole, hydrated } = useAppStore()
   const gradeId = params.id as string
   const storyId = params.storyId as string
-  
+
   const [story, setStory] = useState({
     title_arabic: '',
     content_arabic: '',
-    difficulty: 'easy' as 'easy' | 'medium' | 'hard'
+    difficulty: 'easy' as 'easy' | 'medium' | 'hard',
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -31,32 +30,27 @@ export default function EditStory() {
       router.push('/')
       return
     }
-    loadStory()
+    void loadStory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, userRole, router, storyId])
 
   const loadStory = async () => {
     try {
       setIsLoading(true)
-      const { data, error } = await supabase.rpc('admin_get_grade_stories', {
-        grade_num: parseInt(gradeId)
-      })
-
-      if (error) throw error
-
-      const currentStory = (data || []).find((s: any) => s.id === storyId)
+      const currentStory = await adminService.getStory(storyId)
       if (currentStory) {
         setStory({
           title_arabic: currentStory.title_arabic,
           content_arabic: currentStory.content_arabic,
-          difficulty: currentStory.difficulty
+          difficulty: currentStory.difficulty,
         })
       } else {
         toast.error('القصة غير موجودة')
         router.push(`/admin/grades/${gradeId}`)
       }
-    } catch (error) {
-      console.error('Error loading story:', error)
-      toast.error('فشل تحميل القصة')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل تحميل القصة'
+      toast.error(message)
       router.push(`/admin/grades/${gradeId}`)
     } finally {
       setIsLoading(false)
@@ -73,24 +67,16 @@ export default function EditStory() {
 
     try {
       setIsSaving(true)
-
-      const { error } = await supabase
-        .from('stories')
-        .update({
-          title_arabic: story.title_arabic,
-          content_arabic: story.content_arabic,
-          difficulty: story.difficulty,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', storyId)
-
-      if (error) throw error
-
+      await adminService.updateStory(storyId, {
+        title_arabic: story.title_arabic,
+        content_arabic: story.content_arabic,
+        difficulty: story.difficulty,
+      })
       toast.success('تم تحديث القصة بنجاح! ')
       router.push(`/admin/grades/${gradeId}`)
-    } catch (error) {
-      console.error('Error updating story:', error)
-      toast.error('فشل تحديث القصة')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل تحديث القصة'
+      toast.error(message)
     } finally {
       setIsSaving(false)
     }
@@ -110,7 +96,6 @@ export default function EditStory() {
   return (
     <div className="page-container min-h-screen">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-ink">تعديل القصة</h1>
           <Button
@@ -123,13 +108,10 @@ export default function EditStory() {
           </Button>
         </div>
 
-        {/* Form */}
         <Card className="p-6">
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="block text-slate-600 font-semibold mb-2">
-                عنوان القصة
-              </label>
+              <label className="block text-slate-600 font-semibold mb-2">عنوان القصة</label>
               <input
                 type="text"
                 value={story.title_arabic}
@@ -141,9 +123,7 @@ export default function EditStory() {
             </div>
 
             <div>
-              <label className="block text-slate-600 font-semibold mb-2">
-                محتوى القصة
-              </label>
+              <label className="block text-slate-600 font-semibold mb-2">محتوى القصة</label>
               <textarea
                 value={story.content_arabic}
                 onChange={(e) => setStory({ ...story, content_arabic: e.target.value })}
@@ -155,12 +135,12 @@ export default function EditStory() {
             </div>
 
             <div>
-              <label className="block text-slate-600 font-semibold mb-2">
-                مستوى الصعوبة
-              </label>
+              <label className="block text-slate-600 font-semibold mb-2">مستوى الصعوبة</label>
               <select
                 value={story.difficulty}
-                onChange={(e) => setStory({ ...story, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
+                onChange={(e) =>
+                  setStory({ ...story, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })
+                }
                 className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary bg-white text-ink font-semibold"
                 disabled={isSaving}
               >
@@ -197,4 +177,3 @@ export default function EditStory() {
     </div>
   )
 }
-

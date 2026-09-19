@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter, useParams } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
-import { supabase, adminGradingService, gradingService } from '@/lib/supabase'
+import { supabase, adminService, adminGradingService, gradingService } from '@/lib/supabase'
 import { getTrustedStudentRecordingUrl, inferAudioMimeFromUrl } from '@/lib/utils'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
@@ -102,16 +102,9 @@ export default function GradeDetails() {
       setIsLoading(true)
       const gradeNum = parseInt(gradeId)
 
-      // Load stories for this grade using RPC
-      const { data: storiesData, error: storiesError } = await supabase.rpc('admin_get_grade_stories', {
-        grade_num: gradeNum
-      })
-
-      console.log('Stories query result:', { data: storiesData, error: storiesError, gradeNum })
-
-      if (!storiesError && storiesData) {
-        setStories(storiesData as Story[])
-      }
+      // Load stories for this grade using secured admin RPC
+      const storiesData = await adminService.getGradeStories(gradeNum)
+      setStories(storiesData as Story[])
 
       // Load forms for this grade using RPC
       const { data: formsData, error: formsError } = await supabase.rpc('admin_get_grade_forms', {
@@ -150,18 +143,13 @@ export default function GradeDetails() {
     }
 
     try {
-      const { error } = await supabase
-        .from('stories')
-        .delete()
-        .eq('id', storyId)
-
-      if (error) throw error
+      await adminService.deleteStory(storyId)
 
       toast.success('تم حذف القصة بنجاح!')
       loadGradeData()
-    } catch (error) {
-      console.error('Error deleting story:', error)
-      toast.error('فشل حذف القصة')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'فشل حذف القصة'
+      toast.error(message)
     }
   }
 
