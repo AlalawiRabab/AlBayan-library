@@ -1,11 +1,9 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
 
-// Temporary dual-accept: legacy production hash + newly rotated Vercel secret hash.
-// Remove the legacy entry after all callers migrate.
+// Accept only the current Vercel Production AUTO_GRADING_RPC_SECRET (SHA-256).
 const EXPECTED_SECRET_HASHES = [
-  'e4eba8cbed3078244cf9b2171cb8b9829a2d056a94cd2781ca0006d80d85d29d',
-  '305c7641887c0f0733c41d4fd5914bc98864017d022ab5356ec13b929a6ff1dc'
+  'a1ac8e0a723bbf5c7804fc593327be371bc5360c8e40cb515204cd4ef192e204'
 ] as const
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MAX_BODY_LENGTH = 100_000
