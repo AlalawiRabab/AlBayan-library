@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callAutoGradingGateway, AutoGradingGatewayError } from '@/lib/autoGradingGateway'
-import { autoGradeSubmission, GradingQuestion, GradingResult } from '@/lib/groq'
+import { autoGradeSubmission, canGradeMultipleChoiceDeterministically, describeAutoGradeClientOutcome, GradingQuestion, GradingResult } from '@/lib/groq'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +17,9 @@ type SubmissionRequest = {
 type PreparedStudentSubmission = {
   alreadySubmitted: boolean
   submission?: {
+    status?: string | null
+    grade?: number | null
+    feedback_arabic?: string | null
     auto_graded?: number | null
     auto_feedback?: string | null
   }
@@ -34,6 +37,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const MAX_REQUEST_LENGTH = 100_000
 const MAX_ANSWER_LENGTH = 8_000
 const MAX_TOTAL_ANSWER_LENGTH = 40_000
+const PENDING_REVIEW_MESSAGE = 'تم حفظ التسليم بنجاح، ويحتاج مراجعة المعلمة لأن التقييم الآلي غير متاح حالياً.'
 
 function validateAudioUrl(value: unknown) {
   if (value === undefined || value === null || value === '') return undefined
@@ -101,8 +105,30 @@ function gatewayErrorResponse(error: unknown) {
       return NextResponse.json({ error: 'تعذر التحقق من بيانات الطالب أو القصة' }, { status: error.status })
     }
   }
-  console.error('Secure student submission failed:', error)
+  console.error('Secure student submission failed')
   return NextResponse.json({ error: 'تعذر حفظ الإجابات' }, { status: 500 })
+}
+
+function responseFromExistingSubmission(submission: NonNullable<PreparedStudentSubmission['submission']>, duplicate: boolean) {
+  const officialGrade = submission.grade ?? null
+  const autoScore = submission.auto_graded ?? null
+  // Official finalize only: status graded or an official grade column. A bare auto_graded
+  // suggestion must not claim autoGraded success while the row remains pending.
+  const isOfficiallyGraded = submission.status === 'graded' || officialGrade !== null
+  const grade = isOfficiallyGraded ? (officialGrade ?? autoScore) : null
+  const feedback = isOfficiallyGraded
+    ? (submission.feedback_arabic ?? submission.auto_feedback ?? null)
+    : null
+
+  return NextResponse.json({
+    autoGraded: isOfficiallyGraded,
+    provisional: !isOfficiallyGraded,
+    grade,
+    feedback,
+    message: isOfficiallyGraded ? undefined : PENDING_REVIEW_MESSAGE,
+    submission,
+    duplicate
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -144,14 +170,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (prepared.alreadySubmitted && prepared.submission) {
-    return NextResponse.json({
-      autoGraded: prepared.submission.auto_graded !== null && prepared.submission.auto_graded !== undefined,
-      provisional: true,
-      grade: prepared.submission.auto_graded ?? null,
-      feedback: prepared.submission.auto_feedback ?? null,
-      submission: prepared.submission,
-      duplicate: true
-    })
+    return responseFromExistingSubmission(prepared.submission, true)
   }
 
   if (!prepared.questions || !prepared.answers || !prepared.story) {
@@ -168,29 +187,45 @@ export async function POST(request: NextRequest) {
       difficulty: prepared.story.difficulty,
       gradeLevel: prepared.story.grade_level
     })
-  } catch (error) {
-    console.error('Groq auto-grading failed; preserving the submission for teacher review:', error)
+  } catch {
+    console.error('Groq auto-grading failed; preserving the submission for teacher review')
   }
 
   try {
-    const persisted = await callAutoGradingGateway<{ submission: unknown; duplicate: boolean }>({
+    const usedOnlyDeterministicMultipleChoice = Boolean(
+      gradingResult
+      && prepared.questions.every(canGradeMultipleChoiceDeterministically)
+    )
+
+    const persisted = await callAutoGradingGateway<{ submission: PreparedStudentSubmission['submission']; duplicate: boolean }>({
       action: 'persist_student',
       ...submission,
       autoGrade: gradingResult?.grade ?? null,
       autoFeedback: gradingResult?.feedback ?? null,
       autoGradingMetadata: gradingResult ? {
         confidence: gradingResult.confidence,
-        requires_review: true,
+        requires_review: false,
         question_scores: gradingResult.questionScores,
-        model: 'openai/gpt-oss-20b'
+        model: usedOnlyDeterministicMultipleChoice
+          ? 'deterministic-multiple-choice'
+          : 'openai/gpt-oss-20b'
       } : null
     })
 
+    if (persisted.duplicate && persisted.submission) {
+      return responseFromExistingSubmission(persisted.submission, true)
+    }
+
+    const finalized = gradingResult !== null
+    const outcome = describeAutoGradeClientOutcome(
+      gradingResult ? { grade: gradingResult.grade, feedback: gradingResult.feedback } : null
+    )
     return NextResponse.json({
-      autoGraded: gradingResult !== null,
-      provisional: true,
-      grade: gradingResult?.grade ?? null,
-      feedback: gradingResult?.feedback ?? null,
+      autoGraded: outcome.autoGraded,
+      provisional: outcome.provisional,
+      grade: outcome.grade,
+      feedback: outcome.feedback,
+      message: finalized ? undefined : PENDING_REVIEW_MESSAGE,
       submission: persisted.submission,
       duplicate: persisted.duplicate
     }, { status: persisted.duplicate ? 200 : 201 })

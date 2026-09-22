@@ -1,5 +1,31 @@
 import 'server-only'
 import Groq from 'groq-sdk'
+import {
+  GradingQuestion,
+  GradingResult,
+  buildDeterministicMultipleChoiceResult,
+  canGradeMultipleChoiceDeterministically,
+  gradeMultipleChoiceQuestion,
+  isNonsenseAnswer,
+  mergeQuestionScores,
+  parseGradingResponse,
+  stripCorrectAnswersForClient
+} from '@/lib/autoGradingLogic'
+
+export type {
+  GradingQuestion,
+  GradingResult
+} from '@/lib/autoGradingLogic'
+
+export {
+  parseGradingResponse,
+  buildPersistedAutoGradeFields,
+  describeAutoGradeClientOutcome,
+  canGradeMultipleChoiceDeterministically,
+  gradeMultipleChoiceQuestion,
+  buildDeterministicMultipleChoiceResult,
+  stripCorrectAnswersForClient
+} from '@/lib/autoGradingLogic'
 
 let groqClient: Groq | null = null
 
@@ -7,6 +33,34 @@ export class GroqConfigurationError extends Error {
   constructor() {
     super('GROQ_API_KEY is not configured')
     this.name = 'GroqConfigurationError'
+  }
+}
+
+export class GroqTimeoutError extends Error {
+  constructor() {
+    super('Groq grading timed out')
+    this.name = 'GroqTimeoutError'
+  }
+}
+
+/** Safe wall-clock limit for student auto-grading Groq calls (20–30s range). */
+export const GROQ_GRADING_TIMEOUT_MS = 25_000
+
+async function withGroqTimeout<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), GROQ_GRADING_TIMEOUT_MS)
+  try {
+    return await operation(controller.signal)
+  } catch (error) {
+    if (
+      controller.signal.aborted
+      || (error instanceof Error && (error.name === 'AbortError' || /aborted|timeout/i.test(error.message)))
+    ) {
+      throw new GroqTimeoutError()
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -24,14 +78,6 @@ export function getGroqClient() {
   return groqClient
 }
 
-export interface GradingQuestion {
-  id: string
-  text_arabic: string
-  type: string
-  required: boolean
-  options?: string[]
-}
-
 export interface GradingRequest {
   questions: GradingQuestion[]
   answers: Record<string, string>
@@ -41,28 +87,23 @@ export interface GradingRequest {
   gradeLevel: number
 }
 
-export interface GradingResult {
-  grade: number
-  feedback: string
-  confidence: number
-  requiresReview: boolean
-  questionScores: Array<{
-    questionId: string
-    score: number
-    reason: string
-  }>
-}
-
 export interface TeacherFeedbackRequest extends GradingRequest {
   studentName: string
   teacherGrade?: number
 }
 
-export async function autoGradeSubmission(request: GradingRequest): Promise<GradingResult> {
+async function gradeOpenEndedWithGroq(
+  request: GradingRequest,
+  openEndedQuestions: GradingQuestion[]
+): Promise<GradingResult> {
   const groq = getGroqClient()
-  const prompt = buildGradingPrompt(request)
+  const openEndedRequest: GradingRequest = {
+    ...request,
+    questions: openEndedQuestions
+  }
+  const prompt = buildGradingPrompt(openEndedRequest)
 
-  const chatCompletion = await groq.chat.completions.create({
+  const chatCompletion = await withGroqTimeout(signal => groq.chat.completions.create({
     model: 'openai/gpt-oss-20b',
     messages: [
       {
@@ -91,12 +132,12 @@ export async function autoGradeSubmission(request: GradingRequest): Promise<Grad
             confidence: { type: 'number', minimum: 0, maximum: 1 },
             question_scores: {
               type: 'array',
-              minItems: request.questions.length,
-              maxItems: request.questions.length,
+              minItems: openEndedQuestions.length,
+              maxItems: openEndedQuestions.length,
               items: {
                 type: 'object',
                 properties: {
-                  question_id: { type: 'string', enum: request.questions.map(question => question.id) },
+                  question_id: { type: 'string', enum: openEndedQuestions.map(question => question.id) },
                   score: { type: 'integer', minimum: 0, maximum: 100 },
                   reason: { type: 'string', minLength: 1, maxLength: 500 }
                 },
@@ -114,14 +155,46 @@ export async function autoGradeSubmission(request: GradingRequest): Promise<Grad
     max_completion_tokens: 1200,
     top_p: 1,
     stream: false
-  })
+  }, { signal }))
 
   const response = chatCompletion.choices[0]?.message?.content
   if (!response) {
     throw new Error('Groq returned an empty grading response')
   }
 
-  return parseGradingResponse(response, request.questions, request.answers)
+  return parseGradingResponse(response, openEndedQuestions, request.answers)
+}
+
+export async function autoGradeSubmission(request: GradingRequest): Promise<GradingResult> {
+  const deterministicQuestions = request.questions.filter(canGradeMultipleChoiceDeterministically)
+  const openEndedQuestions = request.questions.filter(question => !canGradeMultipleChoiceDeterministically(question))
+
+  if (deterministicQuestions.length === request.questions.length) {
+    return buildDeterministicMultipleChoiceResult(request.questions, request.answers)
+  }
+
+  const deterministicScores = deterministicQuestions.map(question =>
+    gradeMultipleChoiceQuestion(question, request.answers[question.id] || '')
+  )
+
+  if (openEndedQuestions.length === 0) {
+    return buildDeterministicMultipleChoiceResult(deterministicQuestions, request.answers)
+  }
+
+  const openEndedResult = await gradeOpenEndedWithGroq(request, openEndedQuestions)
+  const feedbackParts = [
+    deterministicScores.length
+      ? `أسئلة الاختيار من متعدد: ${deterministicScores.filter(score => score.score === 100).length}/${deterministicScores.length} صحيحة.`
+      : '',
+    openEndedResult.feedback
+  ]
+
+  return mergeQuestionScores(
+    request.questions,
+    [...deterministicScores, ...openEndedResult.questionScores],
+    feedbackParts,
+    [openEndedResult.confidence, ...(deterministicScores.length ? [1] : [])]
+  )
 }
 
 export async function generateTeacherFeedback(request: TeacherFeedbackRequest): Promise<string> {
@@ -130,7 +203,7 @@ export async function generateTeacherFeedback(request: TeacherFeedbackRequest): 
     student_name: request.studentName,
     teacher_grade: request.teacherGrade ?? null,
     story_title: request.storyTitle,
-    questions: request.questions.map(question => ({
+    questions: questionsWithoutSecrets(request.questions).map(question => ({
       id: question.id,
       text: question.text_arabic,
       answer: request.answers[question.id] || ''
@@ -179,24 +252,8 @@ export async function generateTeacherFeedback(request: TeacherFeedbackRequest): 
   return feedback
 }
 
-// Helper function to detect nonsense/random answers
-function isNonsenseAnswer(answer: string): boolean {
-  if (!answer || answer.trim().length < 2) return true
-  
-  const trimmedAnswer = answer.trim()
-  
-  // Check for repeated characters (like "HHHH", "CCCC")
-  const repeatedCharRegex = /^(\S)\1{3,}$/
-  if (repeatedCharRegex.test(trimmedAnswer)) return true
-  
-  // Check for only English letters (without Arabic or meaningful content)
-  const hasOnlyLatinChars = /^[a-zA-Z\s]+$/.test(trimmedAnswer)
-  if (hasOnlyLatinChars && trimmedAnswer.length <= 5) return true
-  
-  // Check if answer is too short (less than 3 characters)
-  if (trimmedAnswer.length < 3 && !/[\u0600-\u06FF]/.test(trimmedAnswer)) return true
-  
-  return false
+function questionsWithoutSecrets(questions: GradingQuestion[]) {
+  return stripCorrectAnswersForClient(questions)
 }
 
 function buildGradingPrompt(request: GradingRequest): string {
@@ -209,7 +266,7 @@ function buildGradingPrompt(request: GradingRequest): string {
       content: storyContent,
       difficulty
     },
-    questions: questions.map(question => ({
+    questions: questionsWithoutSecrets(questions).map(question => ({
       id: question.id,
       text: question.text_arabic,
       type: question.type,
@@ -248,77 +305,4 @@ ${JSON.stringify(gradingMaterial)}
 4. أعط تقييماً منفصلاً لكل معرّف سؤال ثم احسب درجة إجمالية متوازنة من 100.
 5. اجعل التعليق من جملتين إلى أربع جمل، بالعربية، من دون Markdown، واذكر نقطة قوة وخطوة تحسين محددة.
 `
-}
-
-function hasPromptInjectionRisk(answers: Record<string, string>) {
-  const combinedAnswers = Object.values(answers).join(' ').toLocaleLowerCase('ar')
-  const suspiciousPatterns = [
-    /ignore\s+(all|any|previous|prior|system|developer)\s+(instructions?|messages?)/i,
-    /system\s+prompt|developer\s+message|assistant\s+message/i,
-    /return\s+(a\s+)?(grade|score)\s*(of|:)\s*100/i,
-    /تجاهل\s+(كل|أي|جميع)?\s*(التعليمات|الأوامر|الرسائل)/,
-    /(أعطني|امنحني|ضع)\s+(درجة|تقييم)\s*(100|مئة)/
-  ]
-  return suspiciousPatterns.some(pattern => pattern.test(combinedAnswers))
-}
-
-export function parseGradingResponse(
-  response: string,
-  questions: GradingQuestion[],
-  answers: Record<string, string>
-): GradingResult {
-  const parsed = JSON.parse(response) as {
-    grade?: unknown
-    feedback?: unknown
-    confidence?: unknown
-    question_scores?: Array<{ question_id?: unknown; score?: unknown; reason?: unknown }>
-  }
-  const reportedGrade = Number(parsed.grade)
-  const feedback = typeof parsed.feedback === 'string' ? parsed.feedback.trim() : ''
-  const confidence = Number(parsed.confidence)
-  const expectedIds = new Set(questions.map(question => question.id))
-  const seenIds = new Set<string>()
-  const questionScores = (parsed.question_scores || []).map(item => {
-    const questionId = typeof item.question_id === 'string' ? item.question_id : ''
-    const score = Number(item.score)
-    const reason = typeof item.reason === 'string' ? item.reason.trim() : ''
-    if (!expectedIds.has(questionId) || seenIds.has(questionId) || !Number.isInteger(score) || score < 0 || score > 100 || !reason) {
-      throw new Error('Groq returned an invalid per-question result')
-    }
-    seenIds.add(questionId)
-    return { questionId, score, reason }
-  })
-
-  if (
-    !Number.isInteger(reportedGrade) ||
-    reportedGrade < 0 ||
-    reportedGrade > 100 ||
-    !feedback ||
-    !Number.isFinite(confidence) ||
-    confidence < 0 ||
-    confidence > 1 ||
-    questionScores.length !== questions.length ||
-    seenIds.size !== expectedIds.size
-  ) {
-    throw new Error('Groq returned an invalid grading result')
-  }
-
-  let grade = Math.round(questionScores.reduce((total, item) => total + item.score, 0) / questionScores.length)
-  if (Math.abs(reportedGrade - grade) > 10) {
-    throw new Error('Groq returned an inconsistent grading result')
-  }
-  const nonsenseCount = questions.filter(question => isNonsenseAnswer(answers[question.id] || '')).length
-  const promptInjectionRisk = hasPromptInjectionRisk(answers)
-
-  if (nonsenseCount > questions.length / 2) grade = Math.min(grade, 20)
-  else if (nonsenseCount > 0) grade = Math.min(grade, 60)
-  if (promptInjectionRisk) grade = Math.min(grade, 20)
-
-  return {
-    grade,
-    feedback,
-    confidence,
-    requiresReview: true,
-    questionScores
-  }
 }
