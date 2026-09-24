@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callAutoGradingGateway, AutoGradingGatewayError } from '@/lib/autoGradingGateway'
 import { autoGradeSubmission, canGradeMultipleChoiceDeterministically, describeAutoGradeClientOutcome, GradingQuestion, GradingResult } from '@/lib/groq'
+import { gradeStudentVoiceRecording } from '@/lib/groqVoice'
+import { calculateFinalGrade } from '@/lib/voiceGradingLogic'
+import {
+  decideVoiceGroqCall,
+  VOICE_ATTEMPTS_EXHAUSTED_MESSAGE,
+  type VoiceAttemptReserveResult
+} from '@/lib/voiceAttemptLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+/**
+ * Hobby Fluid Compute allows up to 300s. We pin 60s so wall-clock budgets
+ * (text ≤25s ∥ voice download+Whisper ≤35s + prepare/persist) stay under the limit.
+ */
+export const maxDuration = 60
 
 type SubmissionRequest = {
   studentAccessCode: string
@@ -19,12 +31,20 @@ type PreparedStudentSubmission = {
   submission?: {
     status?: string | null
     grade?: number | null
+    voice_grade?: number | null
     feedback_arabic?: string | null
     auto_graded?: number | null
     auto_feedback?: string | null
+    audio_url?: string | null
   }
   questions?: GradingQuestion[]
   answers?: Record<string, string>
+  /** Server-to-server only — never echo to browsers. */
+  audioSignedUrl?: string | null
+  reusedVoiceGrade?: number | null
+  reusedVoiceFeedback?: string | null
+  voiceLimitReached?: boolean
+  attemptsRemaining?: number
   story?: {
     title_arabic: string
     content_arabic: string
@@ -38,6 +58,15 @@ const MAX_REQUEST_LENGTH = 100_000
 const MAX_ANSWER_LENGTH = 8_000
 const MAX_TOTAL_ANSWER_LENGTH = 40_000
 const PENDING_REVIEW_MESSAGE = 'تم حفظ التسليم بنجاح، ويحتاج مراجعة المعلمة لأن التقييم الآلي غير متاح حالياً.'
+const VOICE_PENDING_MESSAGE = 'بانتظار مراجعة المعلمة لتقييم القراءة الصوتية.'
+
+/**
+ * Submission status / attempt policy:
+ * - Production uniqueness is only on `submission_key` (partial unique index).
+ * - Voice AI: max 2 attempts per (student_id, story_id) via atomic ledger RPC.
+ * - Same owned audio with existing voice_grade reuses score (no Whisper / no reserve).
+ * - status = 'graded' when grade and/or voice_grade is set; otherwise 'pending'.
+ */
 
 function validateAudioUrl(value: unknown) {
   if (value === undefined || value === null || value === '') return undefined
@@ -96,6 +125,15 @@ function parseSubmissionRequest(value: unknown): SubmissionRequest | null {
   return { studentAccessCode, storyId, formTemplateId, idempotencyKey, answers, audioUrl }
 }
 
+/** Strip signed URLs / tokens from any string that might reach logs or clients. */
+function redactSensitive(value: unknown): string {
+  const text = typeof value === 'string' ? value : (value instanceof Error ? value.message : String(value ?? ''))
+  return text
+    .replace(/https?:\/\/[^\s"'\\]+/gi, '[redacted-url]')
+    .replace(/token=[^&\s]+/gi, 'token=[redacted]')
+    .replace(/signature=[^&\s]+/gi, 'signature=[redacted]')
+}
+
 function gatewayErrorResponse(error: unknown) {
   if (error instanceof AutoGradingGatewayError) {
     if (error.status === 429) {
@@ -105,28 +143,43 @@ function gatewayErrorResponse(error: unknown) {
       return NextResponse.json({ error: 'تعذر التحقق من بيانات الطالب أو القصة' }, { status: error.status })
     }
   }
-  console.error('Secure student submission failed')
+  console.error('Secure student submission failed', redactSensitive(error))
   return NextResponse.json({ error: 'تعذر حفظ الإجابات' }, { status: 500 })
+}
+
+function clientSafeSubmission(submission: NonNullable<PreparedStudentSubmission['submission']>) {
+  // Never include signed URLs or storage tokens in browser responses.
+  const { audio_url, ...safe } = submission
+  return {
+    ...safe,
+    has_audio: Boolean(audio_url)
+  }
 }
 
 function responseFromExistingSubmission(submission: NonNullable<PreparedStudentSubmission['submission']>, duplicate: boolean) {
   const officialGrade = submission.grade ?? null
+  const voiceGrade = submission.voice_grade ?? null
   const autoScore = submission.auto_graded ?? null
-  // Official finalize only: status graded or an official grade column. A bare auto_graded
-  // suggestion must not claim autoGraded success while the row remains pending.
-  const isOfficiallyGraded = submission.status === 'graded' || officialGrade !== null
+  const isOfficiallyGraded = submission.status === 'graded' || officialGrade !== null || voiceGrade !== null
   const grade = isOfficiallyGraded ? (officialGrade ?? autoScore) : null
   const feedback = isOfficiallyGraded
     ? (submission.feedback_arabic ?? submission.auto_feedback ?? null)
     : null
+  const hasAudio = Boolean(submission.audio_url)
+  const voicePending = hasAudio && voiceGrade === null
 
   return NextResponse.json({
     autoGraded: isOfficiallyGraded,
     provisional: !isOfficiallyGraded,
     grade,
+    voiceGrade,
+    finalGrade: calculateFinalGrade(grade, voiceGrade),
     feedback,
-    message: isOfficiallyGraded ? undefined : PENDING_REVIEW_MESSAGE,
-    submission,
+    voiceStatus: voiceGrade !== null ? 'graded' : (hasAudio ? 'awaiting_teacher' : 'none'),
+    message: !isOfficiallyGraded
+      ? PENDING_REVIEW_MESSAGE
+      : (voicePending ? VOICE_PENDING_MESSAGE : undefined),
+    submission: clientSafeSubmission(submission),
     duplicate
   })
 }
@@ -169,6 +222,7 @@ export async function POST(request: NextRequest) {
     return gatewayErrorResponse(error)
   }
 
+  // Idempotency short-circuit: same submission_key → no download, no Groq.
   if (prepared.alreadySubmitted && prepared.submission) {
     return responseFromExistingSubmission(prepared.submission, true)
   }
@@ -177,18 +231,102 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'تعذر تجهيز نموذج التقييم' }, { status: 500 })
   }
 
-  let gradingResult: GradingResult | null = null
-  try {
-    gradingResult = await autoGradeSubmission({
+  const storyContent = prepared.story.content_arabic.slice(0, 30_000)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  let voiceLimitMessage: string | undefined
+
+  // Parallel text + voice after prepare succeeds. One path failing must not cancel the other.
+  const [textSettled, voiceSettled] = await Promise.allSettled([
+    autoGradeSubmission({
       questions: prepared.questions,
       answers: prepared.answers,
-      storyContent: prepared.story.content_arabic.slice(0, 30_000),
+      storyContent,
       storyTitle: prepared.story.title_arabic,
       difficulty: prepared.story.difficulty,
       gradeLevel: prepared.story.grade_level
-    })
-  } catch {
-    console.error('Groq auto-grading failed; preserving the submission for teacher review')
+    }),
+    (async (): Promise<{ voiceGrade: number; feedback: string } | null> => {
+      if (
+        typeof prepared.reusedVoiceGrade === 'number'
+        && Number.isInteger(prepared.reusedVoiceGrade)
+        && prepared.reusedVoiceGrade >= 0
+        && prepared.reusedVoiceGrade <= 100
+        && typeof prepared.reusedVoiceFeedback === 'string'
+        && prepared.reusedVoiceFeedback.trim()
+      ) {
+        // Existing voice_grade for same audio — no new Groq / no new ledger row.
+        return {
+          voiceGrade: prepared.reusedVoiceGrade,
+          feedback: prepared.reusedVoiceFeedback.trim()
+        }
+      }
+
+      if (prepared.voiceLimitReached) {
+        voiceLimitMessage = VOICE_ATTEMPTS_EXHAUSTED_MESSAGE
+        return null
+      }
+
+      if (!submission.audioUrl || !prepared.audioSignedUrl || !supabaseUrl) return null
+
+      // Atomic reserve BEFORE download / Groq. Counts even if Whisper fails.
+      let reserve: VoiceAttemptReserveResult
+      try {
+        const reserved = await callAutoGradingGateway<{
+          allowed: boolean
+          shouldCallGroq: boolean
+        }>({
+          action: 'reserve_voice_attempt',
+          ...submission
+        })
+        reserve = {
+          allowed: reserved.allowed,
+          should_call_groq: reserved.shouldCallGroq
+        }
+      } catch (error) {
+        if (error instanceof AutoGradingGatewayError && error.status === 403) {
+          voiceLimitMessage = VOICE_ATTEMPTS_EXHAUSTED_MESSAGE
+          return null
+        }
+        throw error
+      }
+
+      const decision = decideVoiceGroqCall({
+        hasReusedVoiceGrade: false,
+        hasSignedAudio: true,
+        reserve
+      })
+      if (!decision.callGroq) {
+        if (decision.skipReason === 'limit_reached') {
+          voiceLimitMessage = VOICE_ATTEMPTS_EXHAUSTED_MESSAGE
+        }
+        // Same key retry: already reserved — do not re-call Groq automatically.
+        return null
+      }
+
+      return gradeStudentVoiceRecording({
+        signedAudioUrl: prepared.audioSignedUrl,
+        supabaseUrl,
+        storyContent,
+        expectedStoryId: submission.storyId
+      })
+    })()
+  ])
+
+  // Drop signed URL reference ASAP — never include in responses or thrown errors.
+  prepared.audioSignedUrl = null
+
+  let gradingResult: GradingResult | null = null
+  if (textSettled.status === 'fulfilled') {
+    gradingResult = textSettled.value
+  } else {
+    console.error('Groq auto-grading failed; preserving the submission for teacher review', redactSensitive(textSettled.reason))
+  }
+
+  let voiceResult: { voiceGrade: number; feedback: string } | null = null
+  if (voiceSettled.status === 'fulfilled') {
+    voiceResult = voiceSettled.value
+  } else {
+    console.error('Voice auto-grading failed; leaving voice_grade unset', redactSensitive(voiceSettled.reason))
   }
 
   try {
@@ -202,31 +340,50 @@ export async function POST(request: NextRequest) {
       ...submission,
       autoGrade: gradingResult?.grade ?? null,
       autoFeedback: gradingResult?.feedback ?? null,
-      autoGradingMetadata: gradingResult ? {
-        confidence: gradingResult.confidence,
-        requires_review: false,
-        question_scores: gradingResult.questionScores,
-        model: usedOnlyDeterministicMultipleChoice
-          ? 'deterministic-multiple-choice'
-          : 'openai/gpt-oss-20b'
-      } : null
+      voiceGrade: voiceResult?.voiceGrade ?? null,
+      voiceFeedback: voiceResult?.feedback ?? null,
+      autoGradingMetadata: {
+        ...(gradingResult ? {
+          confidence: gradingResult.confidence,
+          requires_review: false,
+          question_scores: gradingResult.questionScores,
+          model: usedOnlyDeterministicMultipleChoice
+            ? 'deterministic-multiple-choice'
+            : 'openai/gpt-oss-20b'
+        } : {}),
+        ...(voiceResult ? {
+          voice_wer_based: true,
+          voice_reused: typeof prepared.reusedVoiceGrade === 'number'
+        } : {}),
+        voice_pending_teacher_review: Boolean(submission.audioUrl) && !voiceResult,
+        ...(voiceLimitMessage ? { voice_attempt_limit_reached: true } : {})
+      }
     })
 
     if (persisted.duplicate && persisted.submission) {
       return responseFromExistingSubmission(persisted.submission, true)
     }
 
-    const finalized = gradingResult !== null
-    const outcome = describeAutoGradeClientOutcome(
+    const textOutcome = describeAutoGradeClientOutcome(
       gradingResult ? { grade: gradingResult.grade, feedback: gradingResult.feedback } : null
     )
+    const voiceGrade = voiceResult?.voiceGrade ?? null
+    const finalized = textOutcome.autoGraded || voiceGrade !== null
+    const feedbackParts = [textOutcome.feedback, voiceResult?.feedback].filter(Boolean)
+
     return NextResponse.json({
-      autoGraded: outcome.autoGraded,
-      provisional: outcome.provisional,
-      grade: outcome.grade,
-      feedback: outcome.feedback,
-      message: finalized ? undefined : PENDING_REVIEW_MESSAGE,
-      submission: persisted.submission,
+      autoGraded: finalized,
+      provisional: !finalized,
+      grade: textOutcome.grade,
+      voiceGrade,
+      finalGrade: calculateFinalGrade(textOutcome.grade, voiceGrade),
+      feedback: feedbackParts.length ? feedbackParts.join(' ') : null,
+      voiceStatus: voiceGrade !== null ? 'graded' : (submission.audioUrl ? 'awaiting_teacher' : 'none'),
+      message: voiceLimitMessage
+        || (!finalized
+          ? PENDING_REVIEW_MESSAGE
+          : (submission.audioUrl && voiceGrade === null ? VOICE_PENDING_MESSAGE : undefined)),
+      submission: persisted.submission ? clientSafeSubmission(persisted.submission) : null,
       duplicate: persisted.duplicate
     }, { status: persisted.duplicate ? 200 : 201 })
   } catch (error) {

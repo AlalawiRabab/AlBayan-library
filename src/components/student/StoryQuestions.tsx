@@ -9,6 +9,10 @@ import { useAppStore } from '@/lib/store'
 import { formsService } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { ArrowRight, Send, BookOpen, AlertCircle, Mic } from 'lucide-react'
+import {
+  formatVoiceAttemptsRemainingMessage,
+  VOICE_ATTEMPTS_EXHAUSTED_MESSAGE
+} from '@/lib/voiceAttemptLimit'
 
 interface Question {
   id: string
@@ -53,11 +57,14 @@ export default function StoryQuestions(props: Props) {
   const [hasAudio, setHasAudio] = useState(false)
   const [hasSavedAudio, setHasSavedAudio] = useState(false)
   const [firstUnansweredId, setFirstUnansweredId] = useState<string | null>(null)
+  const [voiceAttemptsRemaining, setVoiceAttemptsRemaining] = useState<number | null>(null)
+  const [voiceLimitReached, setVoiceLimitReached] = useState(false)
   const questionRefs = React.useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
     if (!isAuthenticated || !user) return
     loadFormTemplate()
+    loadVoiceAttemptStatus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user, storyId])
 
@@ -87,6 +94,30 @@ export default function StoryQuestions(props: Props) {
     }
     setFirstUnansweredId(null)
   }, [formTemplate, answers])
+
+  const loadVoiceAttemptStatus = async () => {
+    try {
+      const studentData = user as any
+      const studentAccessCode = studentData?.access_code
+      if (!studentAccessCode) return
+      const response = await fetch('/api/student/voice-attempt-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ studentAccessCode, storyId })
+      })
+      if (!response.ok) return
+      const data = await response.json() as {
+        attemptsRemaining?: number
+        limitReached?: boolean
+      }
+      if (typeof data.attemptsRemaining === 'number') {
+        setVoiceAttemptsRemaining(data.attemptsRemaining)
+      }
+      setVoiceLimitReached(Boolean(data.limitReached) || data.attemptsRemaining === 0)
+    } catch {
+      // Non-blocking: submit path still enforces the limit server-side.
+    }
+  }
 
   const loadFormTemplate = async () => {
     try {
@@ -145,15 +176,32 @@ export default function StoryQuestions(props: Props) {
     }
   }
 
+  const guardVoiceRecordingAction = (action?: () => void) => {
+    if (voiceLimitReached) {
+      toast.error(VOICE_ATTEMPTS_EXHAUSTED_MESSAGE)
+      return
+    }
+    action?.()
+  }
+
   const handlePrimaryAction = async () => {
     if (!hasAudio) {
+      if (voiceLimitReached) {
+        toast.error(VOICE_ATTEMPTS_EXHAUSTED_MESSAGE)
+        return
+      }
       toast.error(' يجب تسجيل الصوت أولاً')
       scrollToRecording()
       return
     }
     // If there is a freshly recorded audio (from page) but not yet saved to cloud/localStorage, submit recording first
     if (!hasSavedAudio && hasAudioExternal && onSubmitRecording) {
+      if (voiceLimitReached) {
+        toast.error(VOICE_ATTEMPTS_EXHAUSTED_MESSAGE)
+        return
+      }
       await onSubmitRecording()
+      await loadVoiceAttemptStatus()
       return
     }
     if (firstUnansweredId) {
@@ -191,7 +239,10 @@ export default function StoryQuestions(props: Props) {
         idempotencyKey = crypto.randomUUID()
         localStorage.setItem(submissionKeyStorage, idempotencyKey)
       }
-      toast.loading('جاري تقييم الإجابات بالذكاء الاصطناعي...', { id: 'auto-grading' })
+      toast.loading(
+        audioUrl ? 'جارٍ تقييم القراءة آليًا وتصحيح الإجابات...' : 'جاري تقييم الإجابات بالذكاء الاصطناعي...',
+        { id: 'auto-grading' }
+      )
       const submissionResponse = await fetch('/api/student/submit-and-auto-grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -211,7 +262,23 @@ export default function StoryQuestions(props: Props) {
       }
 
       if (submissionResult.autoGraded) {
-        toast.success(`تم التقييم التلقائي! الدرجة: ${submissionResult.grade}`, { id: 'auto-grading' })
+        const parts: string[] = []
+        if (submissionResult.grade !== null && submissionResult.grade !== undefined) {
+          parts.push(`الأسئلة: ${submissionResult.grade}`)
+        }
+        if (submissionResult.voiceGrade !== null && submissionResult.voiceGrade !== undefined) {
+          parts.push(`القراءة: ${submissionResult.voiceGrade}`)
+        }
+        if (submissionResult.finalGrade !== null && submissionResult.finalGrade !== undefined) {
+          parts.push(`المعدل: ${submissionResult.finalGrade}`)
+        }
+        toast.success(
+          parts.length ? `تم التقييم التلقائي! ${parts.join(' · ')}` : 'تم التقييم التلقائي بنجاح',
+          { id: 'auto-grading' }
+        )
+        if (submissionResult.voiceStatus === 'awaiting_teacher') {
+          toast.error(submissionResult.message || 'بانتظار مراجعة المعلمة لتقييم القراءة الصوتية.')
+        }
       } else {
         toast.error(
           submissionResult.message || 'تم حفظ التسليم بنجاح، ويحتاج مراجعة المعلمة لأن التقييم الآلي غير متاح حالياً.',
@@ -389,16 +456,24 @@ export default function StoryQuestions(props: Props) {
         <div className="mx-auto max-w-6xl">
           <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-xl md:p-4">
             {/* Contextual message area */}
-            {!hasAudio && (
+            {voiceLimitReached ? (
+              <div className="text-amber-800 text-sm md:text-base mb-2">
+                {VOICE_ATTEMPTS_EXHAUSTED_MESSAGE}
+              </div>
+            ) : voiceAttemptsRemaining !== null ? (
+              <div className="text-gray-800 text-sm md:text-base mb-2">
+                {formatVoiceAttemptsRemainingMessage(voiceAttemptsRemaining)}
+              </div>
+            ) : !hasAudio ? (
               <div className="text-gray-800 text-sm md:text-base mb-2">
                  تسجيل القراءة مطلوب قبل إرسال الإجابات
               </div>
-            )}
+            ) : null}
             <div className="flex flex-wrap items-center gap-3">
               {/* Recording CTA when no audio and handlers provided */}
-              {!hasAudio && onStartRecording && (
+              {!hasAudio && onStartRecording && !voiceLimitReached && (
                 <Button
-                  onClick={isRecordingExternal ? onStopRecording : onStartRecording}
+                  onClick={isRecordingExternal ? onStopRecording : () => guardVoiceRecordingAction(onStartRecording)}
                   variant={isRecordingExternal ? 'danger' : 'secondary'}
                   size="md"
                   className="whitespace-nowrap"
@@ -418,9 +493,9 @@ export default function StoryQuestions(props: Props) {
                 </Button>
               )}
               {/* Record again: delete old and start new */}
-              {hasAudio && onResetRecording && (
+              {hasAudio && onResetRecording && !voiceLimitReached && (
                 <Button
-                  onClick={onResetRecording}
+                  onClick={() => guardVoiceRecordingAction(onResetRecording)}
                   variant="ghost"
                   size="md"
                   className="whitespace-nowrap min-w-[140px] border-2 border-gray-300"
@@ -433,12 +508,14 @@ export default function StoryQuestions(props: Props) {
                 variant={!hasAudio || (!hasSavedAudio && hasAudioExternal) || firstUnansweredId ? 'secondary' : 'primary'}
                 size="md"
                 isLoading={isSubmitting}
-                disabled={isSubmitting}
+                disabled={isSubmitting || (voiceLimitReached && !hasAudio)}
                 icon={<Send className="w-4 h-4 md:w-5 md:h-5" />}
                 className="flex-1 min-w-[200px] text-base md:text-lg"
               >
                 {isSubmitting
                   ? 'جاري الإرسال...'
+                  : voiceLimitReached && !hasAudio
+                    ? 'التقييم الصوتي غير متاح'
                   : !hasAudio
                     ? ' سجّل صوتك أولاً'
                     : (!hasSavedAudio && hasAudioExternal)

@@ -8,6 +8,7 @@ import Button from '@/components/Button'
 import Card from '@/components/Card'
 import { useAppStore } from '@/lib/store'
 import { studentSubmissionsService } from '@/lib/supabase'
+import { calculateFinalGrade } from '@/lib/voiceGradingLogic'
 import toast, { Toaster } from 'react-hot-toast'
 import { 
   BookOpen,
@@ -62,13 +63,6 @@ export default function StudentSubmissionsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const calculateFinalGrade = (grade?: number, voiceGrade?: number) => {
-    if (grade !== null && grade !== undefined && voiceGrade !== null && voiceGrade !== undefined) {
-      return Math.round((grade + voiceGrade) / 2)
-    }
-    return grade ?? voiceGrade ?? null
   }
 
   const getGradeColor = (finalGrade: number) => {
@@ -181,23 +175,30 @@ export default function StudentSubmissionsPage() {
                                 </p>
                               </div>
 
-                              {/* AI Grade */}
+                              {/* Questions Grade */}
                               {submission.grade !== null && submission.grade !== undefined && (
                                 <div className="bg-white   rounded-lg p-3 border border-primary-200/30 text-center">
                                   <label className="block text-primary-700 font-semibold mb-1 text-xs">
-                                    تقييم النموذج
+                                    درجة الأسئلة
                                   </label>
                                   <p className="text-ink font-bold text-lg">{submission.grade}/100</p>
                                 </div>
                               )}
 
                               {/* Voice Grade */}
-                              {submission.voice_grade !== null && submission.voice_grade !== undefined && (
+                              {submission.voice_grade !== null && submission.voice_grade !== undefined ? (
                                 <div className="bg-white   rounded-lg p-3 border border-secondary-200/30 text-center">
                                   <label className="block text-secondary-700 font-semibold mb-1 text-xs">
-                                    تقييم القراءة الصوتية
+                                    درجة القراءة الصوتية
                                   </label>
                                   <p className="text-ink font-bold text-lg">{submission.voice_grade}/100</p>
+                                </div>
+                              ) : (
+                                <div className="bg-white rounded-lg p-3 border border-amber-200/30 text-center">
+                                  <label className="block text-amber-700 font-semibold mb-1 text-xs">
+                                    درجة القراءة الصوتية
+                                  </label>
+                                  <p className="text-amber-700 font-semibold text-sm">بانتظار مراجعة المعلمة</p>
                                 </div>
                               )}
 
