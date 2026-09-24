@@ -29,6 +29,7 @@ type Question = {
   type: string
   required: boolean
   options?: string[]
+  correct_answer?: string
 }
 
 const jsonHeaders = {
@@ -87,12 +88,20 @@ function parseQuestions(value: unknown): Question[] | null {
       ? question.options.filter((option): option is string => typeof option === 'string').map(option => option.trim())
       : undefined
 
+    const correctAnswerRaw = typeof question.correct_answer === 'string' ? question.correct_answer.trim() : ''
+    const correctAnswer = type === 'multiple_choice'
+      && correctAnswerRaw
+      && (!options?.length || options.includes(correctAnswerRaw))
+      ? correctAnswerRaw
+      : undefined
+
     questions.push({
       id,
       text_arabic: text,
       type,
       required: question.required === true,
-      options
+      options,
+      ...(correctAnswer ? { correct_answer: correctAnswer } : {})
     })
   }
 
@@ -514,6 +523,10 @@ Deno.serve(async request => {
           ? body.autoGradingMetadata
           : null
 
+        // Promote validated AI scores to official grade so leaderboard/graded_submissions count them.
+        // auto_graded remains an integer suggestion/score column (not a boolean).
+        const submittedAt = new Date().toISOString()
+        const finalized = autoGrade !== null && autoFeedback !== null
         const { data: inserted, error: insertError } = await supabase
           .from('student_submissions')
           .insert({
@@ -526,8 +539,11 @@ Deno.serve(async request => {
             auto_feedback: autoFeedback,
             auto_grading_metadata: metadata,
             submission_key: context.idempotencyKey,
-            submitted_at: new Date().toISOString(),
-            status: 'pending'
+            submitted_at: submittedAt,
+            grade: finalized ? autoGrade : null,
+            feedback_arabic: finalized ? autoFeedback : null,
+            graded_at: finalized ? submittedAt : null,
+            status: finalized ? 'graded' : 'pending'
           })
           .select('id, student_id, story_id, form_template_id, submitted_at, status, grade, feedback_arabic, auto_graded, auto_feedback')
           .single()

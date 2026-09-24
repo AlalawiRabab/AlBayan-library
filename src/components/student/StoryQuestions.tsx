@@ -213,7 +213,10 @@ export default function StoryQuestions(props: Props) {
       if (submissionResult.autoGraded) {
         toast.success(`تم التقييم التلقائي! الدرجة: ${submissionResult.grade}`, { id: 'auto-grading' })
       } else {
-        toast.error('فشل التقييم التلقائي، تم إرسال الإجابة للمعلم', { id: 'auto-grading' })
+        toast.error(
+          submissionResult.message || 'تم حفظ التسليم بنجاح، ويحتاج مراجعة المعلمة لأن التقييم الآلي غير متاح حالياً.',
+          { id: 'auto-grading' }
+        )
       }
 
       if (audioUrl) {
