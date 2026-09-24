@@ -62,11 +62,23 @@ export async function POST(request: NextRequest) {
       if (error.status === 429) {
         return NextResponse.json({ error: 'تم تجاوز عدد محاولات رفع التسجيل. يرجى الانتظار قليلاً.' }, { status: 429 })
       }
+      if (error.status === 403) {
+        const limitReached = /voice grading attempt limit/i.test(error.message)
+        return NextResponse.json(
+          {
+            error: limitReached
+              ? 'تم استخدام محاولتي التقييم الصوتي لهذه القصة'
+              : 'غير مصرح برفع هذا التسجيل',
+            code: limitReached ? 'voice_attempt_limit_reached' : undefined
+          },
+          { status: 403 }
+        )
+      }
       if (error.status >= 400 && error.status < 500) {
         return NextResponse.json({ error: 'غير مصرح برفع هذا التسجيل' }, { status: error.status })
       }
     }
-    console.error('Audio upload authorization failed:', error)
+    console.error('Audio upload authorization failed')
     return NextResponse.json({ error: 'تعذر تجهيز رفع التسجيل الصوتي' }, { status: 500 })
   }
 }

@@ -189,6 +189,67 @@ function recordingObjectPath(value: unknown, supabaseUrl: string) {
   }
 }
 
+/** Path must live under bucket student-recordings and belong to this student+story. */
+function ownedVoiceRecordingPath(
+  audioUrl: string,
+  supabaseUrl: string,
+  studentId: string,
+  studentAccessCode: string,
+  storyId: string
+) {
+  if (!isStudentRecordingUrl(audioUrl, supabaseUrl, studentId, studentAccessCode, storyId)) return null
+  const objectPath = recordingObjectPath(audioUrl, supabaseUrl)
+  if (!objectPath || !objectPath.startsWith('voice-recordings/')) return null
+
+  const relative = objectPath.slice('voice-recordings/'.length)
+  const modernPrefix = `${studentId}/${storyId}/`
+  if (relative.startsWith(modernPrefix)) {
+    const filename = relative.slice(modernPrefix.length)
+    if (!/^[0-9a-f-]{36}\.(webm|mp3|mp4|aac|ogg)$/i.test(filename)) return null
+    return objectPath
+  }
+
+  const legacyPrefix = `${studentAccessCode}_${storyId}_`
+  if (!relative.includes('/') && relative.startsWith(legacyPrefix) && /^\d+\.(webm|mp3|mp4|aac|ogg)$/i.test(relative.slice(legacyPrefix.length))) {
+    return objectPath
+  }
+  return null
+}
+
+async function findPriorVoiceGradeForSameAudio(
+  supabase: ServiceClient,
+  studentId: string,
+  storyId: string,
+  formTemplateId: string,
+  objectPath: string,
+  supabaseUrl: string
+) {
+  const { data, error } = await supabase
+    .from('student_submissions')
+    .select('id, voice_grade, auto_grading_metadata, audio_url')
+    .eq('student_id', studentId)
+    .eq('story_id', storyId)
+    .eq('form_template_id', formTemplateId)
+    .not('voice_grade', 'is', null)
+    .order('submitted_at', { ascending: false })
+    .limit(20)
+  if (error) throw error
+
+  for (const row of data || []) {
+    const priorPath = recordingObjectPath(row.audio_url, supabaseUrl)
+    if (priorPath !== objectPath) continue
+    const metadata = row.auto_grading_metadata && typeof row.auto_grading_metadata === 'object'
+      ? row.auto_grading_metadata as JsonRecord
+      : {}
+    const feedback = typeof metadata.voice_feedback === 'string' ? metadata.voice_feedback : null
+    return {
+      voiceGrade: Number(row.voice_grade),
+      voiceFeedback: feedback
+    }
+  }
+  return null
+}
+
 async function signSubmissionRecordings(
   supabase: ServiceClient,
   submissions: JsonRecord[],
@@ -348,11 +409,132 @@ async function findSubmissionByKey(
 ) {
   const { data, error } = await supabase
     .from('student_submissions')
-    .select('id, student_id, story_id, form_template_id, submitted_at, status, grade, feedback_arabic, auto_graded, auto_feedback')
+    .select('id, student_id, story_id, form_template_id, submitted_at, status, grade, feedback_arabic, auto_graded, auto_feedback, voice_grade, audio_url')
     .eq('submission_key', idempotencyKey)
     .maybeSingle()
   if (error) throw error
   return data
+}
+
+type VoiceAttemptStatus = {
+  attempts_used: number
+  attempts_remaining: number
+  max_attempts: number
+  limit_reached: boolean
+}
+
+type VoiceAttemptReserve = {
+  allowed: boolean
+  should_call_groq: boolean
+  duplicate_key: boolean
+  attempts_used: number
+  attempts_remaining: number
+  max_attempts: number
+  limit_reached: boolean
+  reason?: string
+  attempt_number?: number
+  attempt_id?: string
+}
+
+async function getVoiceAttemptStatus(
+  supabase: ServiceClient,
+  studentId: string,
+  storyId: string
+): Promise<VoiceAttemptStatus> {
+  const { data, error } = await supabase.rpc('get_voice_grading_attempt_status', {
+    p_student_id: studentId,
+    p_story_id: storyId
+  })
+  if (error) throw error
+  const row = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
+  const used = Number(row.attempts_used) || 0
+  const remaining = Number(row.attempts_remaining)
+  const maxAttempts = 2
+  return {
+    attempts_used: used,
+    attempts_remaining: Number.isFinite(remaining) ? remaining : Math.max(maxAttempts - used, 0),
+    max_attempts: maxAttempts,
+    limit_reached: Boolean(row.limit_reached) || used >= maxAttempts
+  }
+}
+
+async function reserveVoiceAttempt(
+  supabase: ServiceClient,
+  studentId: string,
+  storyId: string,
+  submissionKey: string
+): Promise<VoiceAttemptReserve> {
+  const { data, error } = await supabase.rpc('reserve_voice_grading_attempt', {
+    p_student_id: studentId,
+    p_story_id: storyId,
+    p_submission_key: submissionKey
+  })
+  if (error) throw error
+  const row = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
+  return {
+    allowed: row.allowed === true,
+    should_call_groq: row.should_call_groq === true,
+    duplicate_key: false,
+    attempts_used: 0,
+    attempts_remaining: 0,
+    max_attempts: 2,
+    limit_reached: row.allowed !== true
+  }
+}
+
+async function resolveStudentForStoryAccess(
+  supabase: ServiceClient,
+  studentAccessCode: string,
+  storyId: string
+) {
+  const [{ data: student, error: studentError }, { data: story, error: storyError }] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, name, is_registered')
+      .eq('access_code', studentAccessCode)
+      .maybeSingle(),
+    supabase
+      .from('stories')
+      .select('id, grade_level, is_active')
+      .eq('id', storyId)
+      .eq('is_active', true)
+      .maybeSingle()
+  ])
+  if (studentError || storyError) throw studentError || storyError
+  if (!student || !story || (student.is_registered !== true && !student.name)) return null
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from('student_classrooms')
+    .select('classroom_id')
+    .eq('student_id', student.id)
+  if (membershipError) throw membershipError
+  const classroomIds = (memberships || []).map(row => row.classroom_id)
+  if (classroomIds.length === 0) return null
+
+  const { data: classrooms, error: classroomError } = await supabase
+    .from('classrooms')
+    .select('id, teacher_id')
+    .in('id', classroomIds)
+    .eq('grade', story.grade_level)
+    .eq('is_active', true)
+  if (classroomError) throw classroomError
+  if (!classrooms?.length) return null
+
+  const teacherIds = classrooms.map(row => row.teacher_id).filter((id): id is string => typeof id === 'string')
+  if (teacherIds.length > 0) {
+    const { data: teachers, error: teacherError } = await supabase
+      .from('teachers')
+      .select('id')
+      .in('id', teacherIds)
+      .eq('is_active', true)
+    if (teacherError) throw teacherError
+    const activeTeacherIds = new Set((teachers || []).map(teacher => teacher.id))
+    if (!classrooms.some(row => !row.teacher_id || activeTeacherIds.has(row.teacher_id))) {
+      return null
+    }
+  }
+
+  return { student, story }
 }
 
 Deno.serve(async request => {
@@ -400,60 +582,23 @@ Deno.serve(async request => {
           return respond(400, { error: 'Invalid audio upload request' })
         }
 
-        const [{ data: student, error: studentError }, { data: story, error: storyError }] = await Promise.all([
-          supabase
-            .from('students')
-            .select('id, name, is_registered')
-            .eq('access_code', studentAccessCode)
-            .maybeSingle(),
-          supabase
-            .from('stories')
-            .select('id, grade_level, is_active')
-            .eq('id', storyId)
-            .eq('is_active', true)
-            .maybeSingle()
-        ])
-        if (studentError || storyError) throw studentError || storyError
-        if (!student || !story || (student.is_registered !== true && !student.name)) {
-          return respond(403, { error: 'Audio upload is not authorized' })
+        const access = await resolveStudentForStoryAccess(supabase, studentAccessCode, storyId)
+        if (!access) return respond(403, { error: 'Audio upload is not authorized' })
+
+        const attemptStatus = await getVoiceAttemptStatus(supabase, access.student.id, access.story.id)
+        if (attemptStatus.limit_reached) {
+          return respond(403, {
+            error: 'Voice grading attempt limit reached',
+            code: 'voice_attempt_limit_reached',
+            attemptsRemaining: 0
+          })
         }
 
-        const { data: memberships, error: membershipError } = await supabase
-          .from('student_classrooms')
-          .select('classroom_id')
-          .eq('student_id', student.id)
-        if (membershipError) throw membershipError
-        const classroomIds = (memberships || []).map(row => row.classroom_id)
-        if (classroomIds.length === 0) return respond(403, { error: 'Audio upload is not authorized' })
-
-        const { data: classrooms, error: classroomError } = await supabase
-          .from('classrooms')
-          .select('id, teacher_id')
-          .in('id', classroomIds)
-          .eq('grade', story.grade_level)
-          .eq('is_active', true)
-        if (classroomError) throw classroomError
-        if (!classrooms?.length) return respond(403, { error: 'Audio upload is not authorized' })
-
-        const teacherIds = classrooms.map(row => row.teacher_id).filter((id): id is string => typeof id === 'string')
-        if (teacherIds.length > 0) {
-          const { data: teachers, error: teacherError } = await supabase
-            .from('teachers')
-            .select('id')
-            .in('id', teacherIds)
-            .eq('is_active', true)
-          if (teacherError) throw teacherError
-          const activeTeacherIds = new Set((teachers || []).map(teacher => teacher.id))
-          if (!classrooms.some(row => !row.teacher_id || activeTeacherIds.has(row.teacher_id))) {
-            return respond(403, { error: 'Audio upload is not authorized' })
-          }
-        }
-
-        if (!await consumeQuota(supabase, 'student_audio', student.id)) {
+        if (!await consumeQuota(supabase, 'student_audio', access.student.id)) {
           return respond(429, { error: 'Too many audio upload requests' })
         }
 
-        const filePath = `voice-recordings/${student.id}/${storyId}/${crypto.randomUUID()}.${extension}`
+        const filePath = `voice-recordings/${access.student.id}/${storyId}/${crypto.randomUUID()}.${extension}`
         const { data: signedUpload, error: signedUploadError } = await supabase.storage
           .from('student-recordings')
           .createSignedUploadUrl(filePath)
@@ -466,7 +611,54 @@ Deno.serve(async request => {
         return respond(200, {
           path: signedUpload.path,
           token: signedUpload.token,
-          publicUrl: publicUrl.publicUrl
+          publicUrl: publicUrl.publicUrl,
+          attemptsRemaining: attemptStatus.attempts_remaining
+        })
+      }
+
+      case 'voice_attempt_status': {
+        const studentAccessCode = requiredString(body.studentAccessCode, 64)
+        const storyId = requiredString(body.storyId, 36)
+        if (!studentAccessCode || !storyId || !UUID_PATTERN.test(storyId)) {
+          return respond(400, { error: 'Invalid voice attempt status request' })
+        }
+        const access = await resolveStudentForStoryAccess(supabase, studentAccessCode, storyId)
+        if (!access) return respond(403, { error: 'Student is not authorized' })
+        const status = await getVoiceAttemptStatus(supabase, access.student.id, access.story.id)
+        return respond(200, {
+          attemptsRemaining: status.attempts_remaining,
+          attemptsUsed: status.attempts_used,
+          maxAttempts: status.max_attempts,
+          limitReached: status.limit_reached
+        })
+      }
+
+      case 'reserve_voice_attempt': {
+        // Auth + ownership first; reserve only when about to call Groq.
+        const context = await loadStudentContext(supabase, body, supabaseUrl)
+        if (!context) return respond(403, { error: 'Student submission is not authorized' })
+        if (!context.audioUrl) return respond(400, { error: 'Audio required to reserve voice attempt' })
+
+        const objectPath = ownedVoiceRecordingPath(
+          context.audioUrl,
+          supabaseUrl,
+          context.student.id,
+          context.studentAccessCode,
+          context.story.id
+        )
+        if (!objectPath) return respond(403, { error: 'Student submission is not authorized' })
+
+        const reserved = await reserveVoiceAttempt(
+          supabase,
+          context.student.id,
+          context.story.id,
+          context.idempotencyKey
+        )
+        // Server-to-server only — never include attempt_id or internal UUIDs.
+        return respond(reserved.allowed ? 200 : 403, {
+          allowed: reserved.allowed,
+          shouldCallGroq: reserved.should_call_groq,
+          code: !reserved.allowed ? 'voice_attempt_limit_reached' : undefined
         })
       }
 
@@ -484,10 +676,72 @@ Deno.serve(async request => {
           return respond(429, { error: 'Too many grading requests' })
         }
 
+        const voiceAttemptStatus = await getVoiceAttemptStatus(
+          supabase,
+          context.student.id,
+          context.story.id
+        )
+
+        let audioSignedUrl: string | null = null
+        let reusedVoiceGrade: number | null = null
+        let reusedVoiceFeedback: string | null = null
+        let voiceLimitReached = false
+        if (context.audioUrl) {
+          const objectPath = ownedVoiceRecordingPath(
+            context.audioUrl,
+            supabaseUrl,
+            context.student.id,
+            context.studentAccessCode,
+            context.story.id
+          )
+          if (!objectPath) {
+            return respond(403, { error: 'Student submission is not authorized' })
+          }
+
+          // Confirm the object exists in the fixed bucket before signing.
+          const folder = objectPath.includes('/') ? objectPath.slice(0, objectPath.lastIndexOf('/')) : ''
+          const fileName = objectPath.slice(objectPath.lastIndexOf('/') + 1)
+          const { data: listed, error: listError } = await supabase.storage
+            .from('student-recordings')
+            .list(folder, { limit: 100, search: fileName })
+          if (listError) throw listError
+          const found = (listed || []).some(item => item.name === fileName)
+          if (!found) return respond(403, { error: 'Student submission is not authorized' })
+
+          const priorVoice = await findPriorVoiceGradeForSameAudio(
+            supabase,
+            context.student.id,
+            context.story.id,
+            context.form.id,
+            objectPath,
+            supabaseUrl
+          )
+          if (priorVoice && Number.isInteger(priorVoice.voiceGrade) && priorVoice.voiceGrade >= 0 && priorVoice.voiceGrade <= 100) {
+            reusedVoiceGrade = priorVoice.voiceGrade
+            reusedVoiceFeedback = priorVoice.voiceFeedback || 'تم إعادة استخدام تقييم القراءة الصوتية السابق لنفس التسجيل.'
+          } else if (voiceAttemptStatus.limit_reached) {
+            // Refuse third AI attempt before signing / download / Groq.
+            voiceLimitReached = true
+            audioSignedUrl = null
+          } else {
+            const { data: signed, error: signedError } = await supabase.storage
+              .from('student-recordings')
+              .createSignedUrl(objectPath, 90)
+            if (signedError) throw signedError
+            audioSignedUrl = signed?.signedUrl || null
+          }
+        }
+
         return respond(200, {
           alreadySubmitted: false,
           questions: context.questions,
           answers: context.answers,
+          // Server-to-server only (Next.js gateway). Never forward to browsers.
+          audioSignedUrl,
+          reusedVoiceGrade,
+          reusedVoiceFeedback,
+          voiceLimitReached,
+          attemptsRemaining: voiceAttemptStatus.attempts_remaining,
           story: {
             title_arabic: context.story.title_arabic,
             content_arabic: context.story.content_arabic,
@@ -507,10 +761,25 @@ Deno.serve(async request => {
           return respond(200, { submission: existing, duplicate: true })
         }
 
+        // Re-assert audio ownership before insert (never trust client path alone).
+        if (context.audioUrl && !ownedVoiceRecordingPath(
+          context.audioUrl,
+          supabaseUrl,
+          context.student.id,
+          context.studentAccessCode,
+          context.story.id
+        )) {
+          return respond(403, { error: 'Student submission is not authorized' })
+        }
+
         const autoGrade = body.autoGrade === null || body.autoGrade === undefined ? null : Number(body.autoGrade)
         const autoFeedback = body.autoFeedback === null || body.autoFeedback === undefined
           ? null
           : requiredString(body.autoFeedback, 1_200)
+        const voiceGrade = body.voiceGrade === null || body.voiceGrade === undefined ? null : Number(body.voiceGrade)
+        const voiceFeedback = body.voiceFeedback === null || body.voiceFeedback === undefined
+          ? null
+          : requiredString(body.voiceFeedback, 400)
 
         if (autoGrade !== null && (!Number.isInteger(autoGrade) || autoGrade < 0 || autoGrade > 100)) {
           return respond(400, { error: 'Invalid automatic grade' })
@@ -518,15 +787,31 @@ Deno.serve(async request => {
         if ((autoGrade === null) !== (autoFeedback === null)) {
           return respond(400, { error: 'Incomplete automatic grade' })
         }
+        if (voiceGrade !== null && (!Number.isInteger(voiceGrade) || voiceGrade < 0 || voiceGrade > 100)) {
+          return respond(400, { error: 'Invalid voice grade' })
+        }
+        if ((voiceGrade === null) !== (voiceFeedback === null)) {
+          return respond(400, { error: 'Incomplete voice grade' })
+        }
 
-        const metadata = body.autoGradingMetadata && typeof body.autoGradingMetadata === 'object'
-          ? body.autoGradingMetadata
-          : null
+        const baseMetadata = body.autoGradingMetadata && typeof body.autoGradingMetadata === 'object'
+          ? body.autoGradingMetadata as JsonRecord
+          : {}
+        const metadata = {
+          ...baseMetadata,
+          ...(voiceFeedback ? { voice_feedback: voiceFeedback } : {}),
+          ...(voiceGrade !== null ? { voice_model: 'whisper-large-v3+wer' } : {})
+        }
+        const metadataOrNull = Object.keys(metadata).length > 0 ? metadata : null
 
-        // Promote validated AI scores to official grade so leaderboard/graded_submissions count them.
-        // auto_graded remains an integer suggestion/score column (not a boolean).
+        const feedbackParts = [autoFeedback, voiceFeedback].filter((part): part is string => Boolean(part))
+        const combinedFeedback = feedbackParts.length > 0 ? feedbackParts.join(' ') : null
+
+        // Promote validated scores so leaderboard/graded_submissions can count the submission.
         const submittedAt = new Date().toISOString()
-        const finalized = autoGrade !== null && autoFeedback !== null
+        const hasTextGrade = autoGrade !== null && autoFeedback !== null
+        const hasVoiceGrade = voiceGrade !== null && voiceFeedback !== null
+        const finalized = hasTextGrade || hasVoiceGrade
         const { data: inserted, error: insertError } = await supabase
           .from('student_submissions')
           .insert({
@@ -537,15 +822,16 @@ Deno.serve(async request => {
             audio_url: context.audioUrl,
             auto_graded: autoGrade,
             auto_feedback: autoFeedback,
-            auto_grading_metadata: metadata,
+            auto_grading_metadata: metadataOrNull,
             submission_key: context.idempotencyKey,
             submitted_at: submittedAt,
-            grade: finalized ? autoGrade : null,
-            feedback_arabic: finalized ? autoFeedback : null,
+            grade: hasTextGrade ? autoGrade : null,
+            voice_grade: hasVoiceGrade ? voiceGrade : null,
+            feedback_arabic: combinedFeedback,
             graded_at: finalized ? submittedAt : null,
             status: finalized ? 'graded' : 'pending'
           })
-          .select('id, student_id, story_id, form_template_id, submitted_at, status, grade, feedback_arabic, auto_graded, auto_feedback')
+          .select('id, student_id, story_id, form_template_id, submitted_at, status, grade, feedback_arabic, auto_graded, auto_feedback, voice_grade')
           .single()
 
         if (insertError?.code === '23505') {

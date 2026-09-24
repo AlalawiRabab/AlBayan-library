@@ -22,7 +22,6 @@ import {
   Save,
   Filter,
   Sparkles
-  ,Loader2
 } from 'lucide-react'
 
 interface Submission {
@@ -392,8 +391,13 @@ export default function StudentDetailPage() {
                                    تسجيل صوتي
                                 </span>
                                 {submission.voice_grade === null && submission.grade !== null && (
-                                  <span className="text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200/30 animate-pulse">
-                                    <Loader2 className="me-1 inline h-3.5 w-3.5 animate-spin" aria-hidden="true" /> في انتظار تقييم الصوت
+                                  <span className="text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200/30">
+                                    بانتظار مراجعة المعلمة
+                                  </span>
+                                )}
+                                {submission.voice_grade !== null && submission.voice_grade !== undefined && (
+                                  <span className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/30">
+                                    قراءة: {submission.voice_grade}/100
                                   </span>
                                 )}
                               </div>
